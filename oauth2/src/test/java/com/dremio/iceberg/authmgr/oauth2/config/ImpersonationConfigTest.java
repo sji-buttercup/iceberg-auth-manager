@@ -15,6 +15,7 @@
  */
 package com.dremio.iceberg.authmgr.oauth2.config;
 
+import static com.dremio.iceberg.authmgr.oauth2.OAuth2Properties.Impersonation.CLIENT_AUTH;
 import static com.dremio.iceberg.authmgr.oauth2.OAuth2Properties.Impersonation.CLIENT_ID;
 import static com.dremio.iceberg.authmgr.oauth2.OAuth2Properties.Impersonation.CLIENT_SECRET;
 import static com.dremio.iceberg.authmgr.oauth2.OAuth2Properties.Impersonation.ENABLED;
@@ -27,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.AssertionsForClassTypes.catchThrowable;
 
+import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthentication;
 import com.dremio.iceberg.authmgr.oauth2.config.validator.ConfigValidator;
 import com.dremio.iceberg.authmgr.oauth2.test.TestConstants;
 import com.google.common.collect.ImmutableMap;
@@ -51,25 +53,35 @@ class ImpersonationConfigTest {
   static Stream<Arguments> testValidate() {
     return Stream.of(
         Arguments.of(
+            ImpersonationConfig.builder().enabled(true).clientId("Client1"),
+            singletonList(
+                "either impersonation issuer URL or impersonation token endpoint must be set (rest.auth.oauth2.impersonation.issuer-url / rest.auth.oauth2.impersonation.token-endpoint)")),
+        Arguments.of(
+            ImpersonationConfig.builder()
+                .enabled(true)
+                .issuerUrl(URI.create("https://example.com")),
+            singletonList(
+                "impersonation client ID must be present when impersonation is enabled (rest.auth.oauth2.impersonation.client-id)")),
+        Arguments.of(
             ImpersonationConfig.builder().issuerUrl(URI.create("/realms/master")),
             singletonList(
-                "Impersonation issuer URL must not be relative (rest.auth.oauth2.impersonation.issuer-url)")),
+                "impersonation issuer URL must not be relative (rest.auth.oauth2.impersonation.issuer-url)")),
         Arguments.of(
             ImpersonationConfig.builder().issuerUrl(URI.create("https://example.com?query")),
             singletonList(
-                "Impersonation issuer URL must not have a query part (rest.auth.oauth2.impersonation.issuer-url)")),
+                "impersonation issuer URL must not have a query part (rest.auth.oauth2.impersonation.issuer-url)")),
         Arguments.of(
             ImpersonationConfig.builder().issuerUrl(URI.create("https://example.com#fragment")),
             singletonList(
-                "Impersonation issuer URL must not have a fragment part (rest.auth.oauth2.impersonation.issuer-url)")),
+                "impersonation issuer URL must not have a fragment part (rest.auth.oauth2.impersonation.issuer-url)")),
         Arguments.of(
             ImpersonationConfig.builder().tokenEndpoint(URI.create("https://example.com?query")),
             singletonList(
-                "Impersonation token endpoint must not have a query part (rest.auth.oauth2.impersonation.token-endpoint)")),
+                "impersonation token endpoint must not have a query part (rest.auth.oauth2.impersonation.token-endpoint)")),
         Arguments.of(
             ImpersonationConfig.builder().tokenEndpoint(URI.create("https://example.com#fragment")),
             singletonList(
-                "Impersonation token endpoint must not have a fragment part (rest.auth.oauth2.impersonation.token-endpoint)")));
+                "impersonation token endpoint must not have a fragment part (rest.auth.oauth2.impersonation.token-endpoint)")));
   }
 
   @ParameterizedTest
@@ -132,6 +144,7 @@ class ImpersonationConfigTest {
                 .put(ISSUER_URL, "https://token-exchange.com/")
                 .put(TOKEN_ENDPOINT, "https://token-exchange.com/")
                 .put(CLIENT_ID, TestConstants.CLIENT_ID1)
+                .put(CLIENT_AUTH, ClientAuthentication.CLIENT_SECRET_BASIC.getCanonicalName())
                 .put(CLIENT_SECRET, TestConstants.CLIENT_SECRET1)
                 .put(SCOPE, TestConstants.SCOPE1)
                 .put(EXTRA_PARAMS_PREFIX + "extra1", "param1")
@@ -210,6 +223,7 @@ class ImpersonationConfigTest {
                 .put(ISSUER_URL, "")
                 .put(TOKEN_ENDPOINT, "")
                 .put(CLIENT_ID, "")
+                .put(CLIENT_AUTH, "")
                 .put(CLIENT_SECRET, "")
                 .put(SCOPE, "")
                 .put(EXTRA_PARAMS_PREFIX + "extra2", "")

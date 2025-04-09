@@ -21,9 +21,9 @@ import org.apache.iceberg.rest.responses.OAuthErrorResponseParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-final class FlowErrorHandler extends ErrorHandler {
+public final class FlowErrorHandler extends ErrorHandler {
 
-  static final ErrorHandler INSTANCE = new FlowErrorHandler();
+  public static final ErrorHandler INSTANCE = new FlowErrorHandler();
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FlowErrorHandler.class);
 

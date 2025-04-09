@@ -111,17 +111,27 @@ class OAuth2AgentSpecTest {
                         .clientId("Client1")
                         .clientSecret("s3cr3t")
                         .build())
-                .impersonationConfig(ImpersonationConfig.builder().enabled(true).build()),
+                .impersonationConfig(
+                    ImpersonationConfig.builder()
+                        .enabled(true)
+                        .tokenEndpoint(URI.create("https://issuer.com/token"))
+                        .clientId("Client1")
+                        .build()),
             singletonList(
                 "impersonation cannot be enabled if grant type is 'token_exchange' (rest.auth.oauth2.impersonation.enabled / rest.auth.oauth2.grant-type)")),
         Arguments.of(
             OAuth2AgentSpec.builder()
                 .basicConfig(
                     BasicConfig.builder()
-                        .tokenEndpoint(URI.create("/token"))
+                        .tokenEndpoint(URI.create("token")) // relative URI -> Iceberg Dialect
                         .clientSecret("s3cr3t")
                         .build())
-                .impersonationConfig(ImpersonationConfig.builder().enabled(true).build()),
+                .impersonationConfig(
+                    ImpersonationConfig.builder()
+                        .enabled(true)
+                        .tokenEndpoint(URI.create("https://issuer.com/token"))
+                        .clientId("Client1")
+                        .build()),
             singletonList(
                 "Iceberg OAuth2 dialect does not support impersonation (rest.auth.oauth2.impersonation.enabled / rest.auth.oauth2.dialect)")));
   }

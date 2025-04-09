@@ -15,6 +15,7 @@
  */
 package com.dremio.iceberg.authmgr.oauth2.config;
 
+import static com.dremio.iceberg.authmgr.oauth2.OAuth2Properties.Impersonation.CLIENT_AUTH;
 import static com.dremio.iceberg.authmgr.oauth2.OAuth2Properties.Impersonation.CLIENT_ID;
 import static com.dremio.iceberg.authmgr.oauth2.OAuth2Properties.Impersonation.CLIENT_SECRET;
 import static com.dremio.iceberg.authmgr.oauth2.OAuth2Properties.Impersonation.ENABLED;
@@ -56,44 +57,41 @@ public interface ImpersonationConfig {
   }
 
   /**
-   * The root URL of an alternate OpenID Connect identity issuer provider, which will be used for
-   * discovering supported endpoints and their locations, but only for impersonation.
+   * The root URL of the impersonation Authorization server, which will be used for discovering
+   * supported endpoints and their locations. For Keycloak, this is typically the realm URL: {@code
+   * https://<keycloak-server>/realms/<realm-name>}.
    *
-   * <p>If neither this property nor {@link #getTokenEndpoint()} are defined, the global token
-   * endpoint will be used for impersonation. This means that the same authorization server will be
-   * used for both the initial token request and the impersonation token exchange.
+   * <p>Two "well-known" paths are supported for endpoint discovery: {@code
+   * .well-known/openid-configuration} and {@code .well-known/oauth-authorization-server}. The full
+   * metadata discovery URL will be constructed by appending these paths to the issuer URL.
    *
-   * <p>Endpoint discovery is performed using the OpenID Connect Discovery metadata published by the
-   * issuer. See <a href="https://openid.net/specs/openid-connect-discovery-1_0.html">OpenID Connect
-   * Discovery 1.0</a> for more information.
+   * <p>Either this property or {@link #getTokenEndpoint()} must be set.
    *
+   * @see <a
+   *     href="https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata">OpenID
+   *     Connect Discovery 1.0</a>
+   * @see <a href="https://tools.ietf.org/html/rfc8414#section-5">RFC 8414 Section 5</a>
    * @see OAuth2Properties.Impersonation#ISSUER_URL
    */
   Optional<URI> getIssuerUrl();
 
   /**
-   * An alternate OAuth2 token endpoint, for impersonation only.
-   *
-   * <p>If neither this property nor {@link #getIssuerUrl()} are defined, the global token endpoint
-   * will be used for impersonation. This means that the same authorization server will be used for
-   * both the initial token request and the impersonation token exchange.
+   * The OAuth2 token endpoint to use for impersonations only. Either this or {@link
+   * #getIssuerUrl()} must be set.
    *
    * @see OAuth2Properties.Impersonation#TOKEN_ENDPOINT
    */
   Optional<URI> getTokenEndpoint();
 
   /**
-   * An alternate client ID to use for impersonations only. If not provided, the global client ID
-   * will be used. If provided, and if the client is confidential, then its authentication method
-   * must be properly configured, and its secret, if any, must be provided with {@link
-   * #getClientSecret()} – the global client authentication method and secret will NOT be used.
+   * The OAuth2 client ID to use for impersonations only.
    *
    * @see OAuth2Properties.Impersonation#CLIENT_ID
    */
   Optional<String> getClientId();
 
   /**
-   * An alternate client authentication method for impersonations only. Defaults to {@link
+   * The OAUth2 client authentication method for impersonations only. Defaults to {@link
    * ClientAuthentication#CLIENT_SECRET_BASIC} if the client is private, or {@link
    * ClientAuthentication#NONE} if the client is public.
    *
@@ -107,42 +105,59 @@ public interface ImpersonationConfig {
   }
 
   /**
-   * An alternate client secret supplier to use for impersonations only. If the alternate client
-   * obtained from {@link #getClientId()} is confidential, this attribute must be set.
+   * The OAuth2 client secret for impersonations only. Must be set if the client is private
+   * (confidential) and client authentication is done using a client secret.
+   *
+   * @see OAuth2Properties.Impersonation#CLIENT_SECRET
    */
   Optional<Secret> getClientSecret();
 
   /**
-   * Custom OAuth2 scopes for impersonation only. Optional.
-   *
-   * <p>If not present, the global scopes will be used for impersonation.
+   * The OAuth2 scopes for impersonation only. Optional.
    *
    * @see OAuth2Properties.Impersonation#SCOPE
    */
-  Optional<List<String>> getScopes();
+  List<String> getScopes();
 
   /**
-   * Additional parameters to be included in the request. This is useful for custom parameters that
-   * are not covered by the standard OAuth2.0 specification.
+   * Additional parameters to be included in the request for impersonation only. This is useful for
+   * custom parameters that are not covered by the standard OAuth2.0 specification.
    *
-   * <p>If not present, the global extra request parameters, if any, will be used for impersonation.
+   * @see OAuth2Properties.Impersonation#EXTRA_PARAMS_PREFIX
    */
-  Optional<Map<String, String>> getExtraRequestParameters();
+  Map<String, String> getExtraRequestParameters();
 
   @Value.Check
   default void validate() {
     ConfigValidator validator = new ConfigValidator();
+    if (isEnabled()) {
+      validator.check(
+          getClientId().isPresent(),
+          CLIENT_ID,
+          "impersonation client ID must be present when impersonation is enabled");
+      validator.check(
+          getIssuerUrl().isPresent() || getTokenEndpoint().isPresent(),
+          List.of(ISSUER_URL, TOKEN_ENDPOINT),
+          "either impersonation issuer URL or impersonation token endpoint must be set");
+      if (getClientAuthentication().isClientSecret()) {
+        validator.check(
+            getClientSecret().isPresent(),
+            List.of(CLIENT_AUTH, CLIENT_SECRET),
+            "client secret must not be empty when client authentication is '%s'",
+            getClientAuthentication().getCanonicalName());
+      }
+    }
     if (getClientId().isPresent()) {
       validator.check(
-          !getClientId().get().isEmpty(), CLIENT_ID, "Impersonation client ID must not be empty");
+          !getClientId().get().isEmpty(), CLIENT_ID, "impersonation client ID must not be empty");
     }
     if (getIssuerUrl().isPresent()) {
       validator.checkEndpoint(
-          getIssuerUrl().get(), true, ISSUER_URL, "Impersonation issuer URL %s");
+          getIssuerUrl().get(), true, ISSUER_URL, "impersonation issuer URL %s");
     }
     if (getTokenEndpoint().isPresent()) {
       validator.checkEndpoint(
-          getTokenEndpoint().get(), true, TOKEN_ENDPOINT, "Impersonation token endpoint %s");
+          getTokenEndpoint().get(), true, TOKEN_ENDPOINT, "impersonation token endpoint %s");
     }
     validator.validate();
   }
@@ -153,6 +168,7 @@ public interface ImpersonationConfig {
     Builder builder = builder();
     builder.enabledOption().merge(properties, isEnabled());
     builder.clientIdOption().merge(properties, getClientId());
+    builder.clientAuthenticationOption().merge(properties, getClientAuthentication());
     builder.clientSecretOption().merge(properties, getClientSecret());
     builder.issuerUrlOption().merge(properties, getIssuerUrl());
     builder.tokenEndpointOption().merge(properties, getTokenEndpoint());
@@ -175,6 +191,7 @@ public interface ImpersonationConfig {
       Objects.requireNonNull(properties, "properties must not be null");
       enabledOption().apply(properties);
       clientIdOption().apply(properties);
+      clientAuthenticationOption().apply(properties);
       clientSecretOption().apply(properties);
       issuerUrlOption().apply(properties);
       tokenEndpointOption().apply(properties);
@@ -188,6 +205,9 @@ public interface ImpersonationConfig {
 
     @CanIgnoreReturnValue
     Builder clientId(String clientId);
+
+    @CanIgnoreReturnValue
+    Builder clientAuthentication(ClientAuthentication clientAuthentication);
 
     @CanIgnoreReturnValue
     default Builder clientSecret(String clientSecret) {
@@ -204,10 +224,10 @@ public interface ImpersonationConfig {
     Builder tokenEndpoint(URI tokenEndpoint);
 
     @CanIgnoreReturnValue
-    Builder scopes(List<String> scopes);
+    Builder scopes(Iterable<String> scopes);
 
     @CanIgnoreReturnValue
-    Builder extraRequestParameters(Map<String, String> extraRequestParameters);
+    Builder extraRequestParameters(Map<String, ? extends String> extraRequestParameters);
 
     ImpersonationConfig build();
 
@@ -217,6 +237,11 @@ public interface ImpersonationConfig {
 
     private ConfigOption<String> clientIdOption() {
       return ConfigOptions.of(CLIENT_ID, this::clientId);
+    }
+
+    private ConfigOption<ClientAuthentication> clientAuthenticationOption() {
+      return ConfigOptions.of(
+          CLIENT_AUTH, this::clientAuthentication, ClientAuthentication::fromConfigName);
     }
 
     private ConfigOption<Secret> clientSecretOption() {

@@ -15,14 +15,7 @@
  */
 package com.dremio.iceberg.authmgr.oauth2.flow;
 
-import com.dremio.iceberg.authmgr.oauth2.agent.OAuth2AgentSpec;
-import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthenticator;
-import com.dremio.iceberg.authmgr.oauth2.config.ConfigUtils;
 import com.dremio.iceberg.authmgr.oauth2.token.Tokens;
-import java.net.URI;
-import java.util.Map;
-import java.util.Optional;
-import org.apache.iceberg.rest.RESTClient;
 
 /**
  * A specialized {@link TokenExchangeFlow} that is performed after the initial token fetch flow, in
@@ -30,17 +23,8 @@ import org.apache.iceberg.rest.RESTClient;
  */
 class ImpersonatingTokenExchangeFlow extends TokenExchangeFlow {
 
-  private final OAuth2AgentSpec spec;
-  private final EndpointResolver endpointResolver;
-
-  ImpersonatingTokenExchangeFlow(
-      OAuth2AgentSpec spec,
-      RESTClient restClient,
-      EndpointResolver endpointResolver,
-      ClientAuthenticator clientAuthenticator) {
-    super(spec, restClient, endpointResolver, clientAuthenticator);
-    this.spec = spec;
-    this.endpointResolver = endpointResolver;
+  ImpersonatingTokenExchangeFlow(FlowContext context) {
+    super(context);
   }
 
   @Override
@@ -49,25 +33,5 @@ class ImpersonatingTokenExchangeFlow extends TokenExchangeFlow {
     // return the new, impersonated access token, but keep the current refresh token
     // so that the original access token can be refreshed, then impersonated again.
     return Tokens.of(newTokens.getAccessToken(), currentTokens.getRefreshToken());
-  }
-
-  @Override
-  protected URI getResolvedTokenEndpoint() {
-    return endpointResolver.getResolvedImpersonationTokenEndpoint();
-  }
-
-  @Override
-  protected Map<String, String> getExtraRequestParameters() {
-    return spec.getImpersonationConfig()
-        .getExtraRequestParameters()
-        .orElseGet(super::getExtraRequestParameters);
-  }
-
-  @Override
-  protected Optional<String> getScopesAsString() {
-    return spec.getImpersonationConfig()
-        .getScopes()
-        .map(ConfigUtils::scopesAsString)
-        .orElseGet(super::getScopesAsString);
   }
 }

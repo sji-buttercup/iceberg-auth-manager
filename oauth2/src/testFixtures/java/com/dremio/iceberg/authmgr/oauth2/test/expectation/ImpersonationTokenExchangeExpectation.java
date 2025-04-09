@@ -16,9 +16,7 @@
 package com.dremio.iceberg.authmgr.oauth2.test.expectation;
 
 import static com.dremio.iceberg.authmgr.oauth2.test.TestConstants.*;
-import static com.dremio.iceberg.authmgr.oauth2.test.TestConstants.CLIENT_CREDENTIALS1_BASE_64;
 import static com.dremio.iceberg.authmgr.oauth2.test.TestConstants.CLIENT_CREDENTIALS2_BASE_64;
-import static com.dremio.iceberg.authmgr.oauth2.test.TestConstants.CLIENT_ID1;
 import static com.dremio.iceberg.authmgr.oauth2.test.TestConstants.CLIENT_ID2;
 import static com.dremio.iceberg.authmgr.oauth2.test.expectation.ExpectationUtils.getParameterBody;
 
@@ -44,11 +42,7 @@ public abstract class ImpersonationTokenExchangeExpectation extends InitialToken
               .withHeader("Accept", "application/json")
               .withBody(getParameterBody(tokenRequestBody()));
       if (getTestEnvironment().isPrivateClient()) {
-        String credentials =
-            getTestEnvironment().isDistinctImpersonationServer()
-                ? CLIENT_CREDENTIALS2_BASE_64
-                : CLIENT_CREDENTIALS1_BASE_64;
-        request.withHeader("Authorization", "Basic " + credentials);
+        request.withHeader("Authorization", "Basic " + CLIENT_CREDENTIALS2_BASE_64);
       }
       getClientAndServer()
           .when(request)
@@ -60,10 +54,8 @@ public abstract class ImpersonationTokenExchangeExpectation extends InitialToken
 
   @Override
   protected PostFormRequest tokenRequestBody() {
-    String clientId =
-        getTestEnvironment().isDistinctImpersonationServer() ? CLIENT_ID2 : CLIENT_ID1;
     return ImmutableTokenExchangeRequest.builder()
-        .clientId(getTestEnvironment().isPrivateClient() ? null : clientId)
+        .clientId(getTestEnvironment().isPrivateClient() ? null : CLIENT_ID2)
         .subjectToken(SUBJECT_TOKEN)
         .subjectTokenType(SUBJECT_TOKEN_TYPE)
         .actorToken(ACTOR_TOKEN)

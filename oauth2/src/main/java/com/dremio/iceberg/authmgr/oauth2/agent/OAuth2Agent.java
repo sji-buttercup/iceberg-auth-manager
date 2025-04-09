@@ -15,11 +15,10 @@
  */
 package com.dremio.iceberg.authmgr.oauth2.agent;
 
-import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthenticator;
-import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthenticatorFactory;
 import com.dremio.iceberg.authmgr.oauth2.config.Dialect;
-import com.dremio.iceberg.authmgr.oauth2.flow.EndpointResolver;
 import com.dremio.iceberg.authmgr.oauth2.flow.Flow;
+import com.dremio.iceberg.authmgr.oauth2.flow.FlowContext;
+import com.dremio.iceberg.authmgr.oauth2.flow.FlowContextFactory;
 import com.dremio.iceberg.authmgr.oauth2.flow.FlowFactory;
 import com.dremio.iceberg.authmgr.oauth2.token.AccessToken;
 import com.dremio.iceberg.authmgr.oauth2.token.RefreshToken;
@@ -56,13 +55,11 @@ public final class OAuth2Agent implements Closeable {
   private static final Duration MIN_WARN_INTERVAL = Duration.ofSeconds(10);
 
   private final OAuth2AgentSpec spec;
-  private final RESTClient restClient;
   private final ScheduledExecutorService executor;
   private final String name;
   private final Clock clock;
-  private final EndpointResolver endpointResolver;
-  private final ClientAuthenticator clientAuthenticator;
-  private final ClientAuthenticator impersonatingClientAuthenticator;
+  private final FlowContext context;
+  private final FlowContext impersonationContext;
 
   private final CompletableFuture<Void> used = new CompletableFuture<>();
   private final AtomicBoolean closing = new AtomicBoolean();
@@ -76,15 +73,11 @@ public final class OAuth2Agent implements Closeable {
   public OAuth2Agent(
       OAuth2AgentSpec spec, RESTClient restClient, ScheduledExecutorService executor) {
     this.spec = spec;
-    this.restClient = restClient;
     this.executor = executor;
     name = spec.getRuntimeConfig().getAgentName();
     clock = spec.getRuntimeConfig().getClock();
-    endpointResolver = EndpointResolver.builder().spec(spec).restClient(restClient).build();
-    clientAuthenticator = ClientAuthenticatorFactory.createAuthenticator(spec);
-    impersonatingClientAuthenticator =
-        ClientAuthenticatorFactory.createImpersonatingAuthenticator(spec)
-            .orElse(clientAuthenticator);
+    context = FlowContextFactory.createFlowContext(spec, restClient);
+    impersonationContext = FlowContextFactory.createImpersonationFlowContext(spec, restClient);
     lastAccess = clock.instant();
     if (spec.getBasicConfig().getToken().isPresent()) {
       currentTokensStage =
@@ -162,7 +155,7 @@ public final class OAuth2Agent implements Closeable {
     LOGGER.debug(
         "[{}] Fetching new access token using {}", name, spec.getBasicConfig().getGrantType());
     try (Flow flow =
-        FlowFactory.forInitialTokenFetch(spec, restClient, endpointResolver, clientAuthenticator)) {
+        FlowFactory.forInitialTokenFetch(spec.getBasicConfig().getGrantType(), context)) {
       return flow.fetchNewTokens(getCurrentTokensIfAvailable());
     } finally {
       if (spec.getBasicConfig().getGrantType().requiresUserInteraction()) {
@@ -181,8 +174,7 @@ public final class OAuth2Agent implements Closeable {
       }
     }
     LOGGER.debug("[{}] Refreshing tokens", name);
-    try (Flow flow =
-        FlowFactory.forTokenRefresh(spec, restClient, endpointResolver, clientAuthenticator)) {
+    try (Flow flow = FlowFactory.forTokenRefresh(spec.getBasicConfig().getDialect(), context)) {
       return flow.fetchNewTokens(currentTokens);
     }
   }
@@ -190,9 +182,7 @@ public final class OAuth2Agent implements Closeable {
   Tokens maybeImpersonate(Tokens currentTokens) {
     if (spec.getImpersonationConfig().isEnabled()) {
       LOGGER.debug("[{}] Performing impersonation", name);
-      try (Flow flow =
-          FlowFactory.forImpersonation(
-              spec, restClient, endpointResolver, impersonatingClientAuthenticator)) {
+      try (Flow flow = FlowFactory.forImpersonation(impersonationContext)) {
         return flow.fetchNewTokens(currentTokens);
       }
     }

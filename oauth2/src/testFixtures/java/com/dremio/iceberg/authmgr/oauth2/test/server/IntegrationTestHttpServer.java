@@ -19,15 +19,9 @@ import java.net.URI;
 
 public class IntegrationTestHttpServer implements HttpServer {
 
-  private final URI rootUrl;
-
-  public IntegrationTestHttpServer(URI rootUrl) {
-    this.rootUrl = rootUrl;
-  }
-
   @Override
   public URI getRootUrl() {
-    return rootUrl;
+    throw new UnsupportedOperationException("Cannot get root URL of integration test server.");
   }
 
   @Override

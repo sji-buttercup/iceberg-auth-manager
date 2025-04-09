@@ -18,8 +18,6 @@ package com.dremio.iceberg.authmgr.oauth2.flow;
 import static com.dremio.iceberg.authmgr.oauth2.flow.FlowUtils.OAUTH2_AGENT_OPEN_URL;
 import static com.dremio.iceberg.authmgr.oauth2.flow.FlowUtils.OAUTH2_AGENT_TITLE;
 
-import com.dremio.iceberg.authmgr.oauth2.agent.OAuth2AgentSpec;
-import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthenticator;
 import com.dremio.iceberg.authmgr.oauth2.rest.DeviceAccessTokenRequest;
 import com.dremio.iceberg.authmgr.oauth2.rest.DeviceAuthorizationResponse;
 import com.dremio.iceberg.authmgr.oauth2.token.Tokens;
@@ -34,7 +32,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.iceberg.exceptions.RESTException;
-import org.apache.iceberg.rest.RESTClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,17 +68,13 @@ class DeviceCodeFlow extends AbstractFlow {
   private volatile Future<?> pollFuture;
 
   @SuppressWarnings("FutureReturnValueIgnored")
-  DeviceCodeFlow(
-      OAuth2AgentSpec spec,
-      RESTClient restClient,
-      EndpointResolver endpointResolver,
-      ClientAuthenticator clientAuthenticator) {
-    super(spec, restClient, endpointResolver, clientAuthenticator);
-    console = spec.getRuntimeConfig().getConsole();
-    msgPrefix = FlowUtils.getMsgPrefix(spec.getRuntimeConfig().getAgentName());
-    flowTimeout = spec.getDeviceCodeConfig().getTimeout();
-    pollInterval = spec.getDeviceCodeConfig().getPollInterval();
-    ignoreServerPollInterval = spec.getDeviceCodeConfig().ignoreServerPollInterval();
+  DeviceCodeFlow(FlowContext context) {
+    super(context);
+    console = context.getRuntimeConfig().getConsole();
+    msgPrefix = FlowUtils.getMsgPrefix(context.getRuntimeConfig().getAgentName());
+    flowTimeout = context.getDeviceCodeConfig().getTimeout();
+    pollInterval = context.getDeviceCodeConfig().getPollInterval();
+    ignoreServerPollInterval = context.getDeviceCodeConfig().ignoreServerPollInterval();
     closeFuture.thenRun(this::doClose);
     LOGGER.debug("Device Auth Flow: started");
     executor = Executors.newSingleThreadScheduledExecutor();

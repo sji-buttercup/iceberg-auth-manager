@@ -15,58 +15,41 @@
  */
 package com.dremio.iceberg.authmgr.oauth2.flow;
 
-import com.dremio.iceberg.authmgr.oauth2.agent.OAuth2AgentSpec;
-import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthenticator;
-import org.apache.iceberg.rest.RESTClient;
+import com.dremio.iceberg.authmgr.oauth2.config.Dialect;
+import com.dremio.iceberg.authmgr.oauth2.grant.GrantType;
 
 public class FlowFactory {
 
-  public static Flow forInitialTokenFetch(
-      OAuth2AgentSpec config,
-      RESTClient restClient,
-      EndpointResolver endpointResolver,
-      ClientAuthenticator clientAuthenticator) {
-    switch (config.getBasicConfig().getGrantType()) {
+  public static Flow forInitialTokenFetch(GrantType grantType, FlowContext context) {
+    switch (grantType) {
       case CLIENT_CREDENTIALS:
-        return new ClientCredentialsFlow(config, restClient, endpointResolver, clientAuthenticator);
+        return new ClientCredentialsFlow(context);
       case PASSWORD:
-        return new PasswordFlow(config, restClient, endpointResolver, clientAuthenticator);
+        return new PasswordFlow(context);
       case AUTHORIZATION_CODE:
-        return new AuthorizationCodeFlow(config, restClient, endpointResolver, clientAuthenticator);
+        return new AuthorizationCodeFlow(context);
       case DEVICE_CODE:
-        return new DeviceCodeFlow(config, restClient, endpointResolver, clientAuthenticator);
+        return new DeviceCodeFlow(context);
       case TOKEN_EXCHANGE:
-        return new TokenExchangeFlow(config, restClient, endpointResolver, clientAuthenticator);
+        return new TokenExchangeFlow(context);
       default:
         throw new IllegalArgumentException(
-            "Unknown or invalid grant type for initial token fetch: "
-                + config.getBasicConfig().getGrantType());
+            "Unknown or invalid grant type for initial token fetch: " + grantType);
     }
   }
 
-  public static Flow forTokenRefresh(
-      OAuth2AgentSpec config,
-      RESTClient restClient,
-      EndpointResolver endpointResolver,
-      ClientAuthenticator clientAuthenticator) {
-    switch (config.getBasicConfig().getDialect()) {
+  public static Flow forTokenRefresh(Dialect dialect, FlowContext context) {
+    switch (dialect) {
       case STANDARD:
-        return new RefreshTokenFlow(config, restClient, endpointResolver, clientAuthenticator);
+        return new RefreshTokenFlow(context);
       case ICEBERG_REST:
-        return new IcebergRefreshTokenFlow(
-            config, restClient, endpointResolver, clientAuthenticator);
+        return new IcebergRefreshTokenFlow(context);
       default:
-        throw new IllegalArgumentException(
-            "Unknown or invalid dialect: " + config.getBasicConfig().getDialect());
+        throw new IllegalArgumentException("Unknown or invalid dialect: " + dialect);
     }
   }
 
-  public static Flow forImpersonation(
-      OAuth2AgentSpec config,
-      RESTClient restClient,
-      EndpointResolver endpointResolver,
-      ClientAuthenticator clientAuthenticator) {
-    return new ImpersonatingTokenExchangeFlow(
-        config, restClient, endpointResolver, clientAuthenticator);
+  public static Flow forImpersonation(FlowContext context) {
+    return new ImpersonatingTokenExchangeFlow(context);
   }
 }

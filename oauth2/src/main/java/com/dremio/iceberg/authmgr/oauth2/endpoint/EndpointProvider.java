@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.dremio.iceberg.authmgr.oauth2.flow;
+package com.dremio.iceberg.authmgr.oauth2.endpoint;
 
-import com.dremio.iceberg.authmgr.oauth2.agent.OAuth2AgentSpec;
+import com.dremio.iceberg.authmgr.oauth2.flow.FlowErrorHandler;
 import com.dremio.iceberg.authmgr.oauth2.rest.MetadataDiscoveryResponse;
 import com.dremio.iceberg.authmgr.oauth2.uri.UriBuilder;
 import com.dremio.iceberg.authmgr.tools.immutables.AuthManagerImmutable;
@@ -30,7 +30,7 @@ import org.apache.iceberg.rest.RESTClient;
 import org.immutables.value.Value;
 
 @AuthManagerImmutable
-public abstract class EndpointResolver {
+public abstract class EndpointProvider {
 
   /**
    * Common locations for OpenID provider metadata.
@@ -46,43 +46,51 @@ public abstract class EndpointResolver {
   public interface Builder {
 
     @CanIgnoreReturnValue
-    Builder spec(OAuth2AgentSpec spec);
+    Builder issuerUrl(URI issuerUrl);
+
+    @CanIgnoreReturnValue
+    Builder tokenEndpoint(URI tokenEndpoint);
+
+    @CanIgnoreReturnValue
+    Builder authorizationEndpoint(URI authorizationEndpoint);
+
+    @CanIgnoreReturnValue
+    Builder deviceAuthorizationEndpoint(URI deviceAuthorizationEndpoint);
 
     @CanIgnoreReturnValue
     Builder restClient(RESTClient restClient);
 
-    EndpointResolver build();
+    EndpointProvider build();
   }
 
   public static Builder builder() {
-    return ImmutableEndpointResolver.builder();
+    return ImmutableEndpointProvider.builder();
   }
 
-  protected abstract OAuth2AgentSpec getSpec();
+  protected abstract Optional<URI> getIssuerUrl();
+
+  protected abstract Optional<URI> getTokenEndpoint();
+
+  protected abstract Optional<URI> getAuthorizationEndpoint();
+
+  protected abstract Optional<URI> getDeviceAuthorizationEndpoint();
 
   protected abstract RESTClient getRestClient();
 
   @Value.Lazy
   public URI getResolvedTokenEndpoint() {
-    return getSpec()
-        .getBasicConfig()
-        .getTokenEndpoint()
-        .orElseGet(() -> getOpenIdProviderMetadata().getTokenEndpoint());
+    return getTokenEndpoint().orElseGet(() -> getOpenIdProviderMetadata().getTokenEndpoint());
   }
 
   @Value.Lazy
   public URI getResolvedAuthorizationEndpoint() {
-    return getSpec()
-        .getAuthorizationCodeConfig()
-        .getAuthorizationEndpoint()
+    return getAuthorizationEndpoint()
         .orElseGet(() -> getOpenIdProviderMetadata().getAuthorizationEndpoint());
   }
 
   @Value.Lazy
   public URI getResolvedDeviceAuthorizationEndpoint() {
-    return getSpec()
-        .getDeviceCodeConfig()
-        .getDeviceAuthorizationEndpoint()
+    return getDeviceAuthorizationEndpoint()
         .or(() -> Optional.ofNullable(getOpenIdProviderMetadata().getDeviceAuthorizationEndpoint()))
         .orElseThrow(
             () ->
@@ -91,30 +99,10 @@ public abstract class EndpointResolver {
   }
 
   @Value.Lazy
-  public URI getResolvedImpersonationTokenEndpoint() {
-    return getSpec()
-        .getImpersonationConfig()
-        .getTokenEndpoint()
-        .or(
-            () ->
-                getImpersonationOpenIdProviderMetadata()
-                    .map(MetadataDiscoveryResponse::getTokenEndpoint))
-        .orElseGet(this::getResolvedTokenEndpoint);
-  }
-
-  @Value.Lazy
   protected MetadataDiscoveryResponse getOpenIdProviderMetadata() {
     URI issuerUrl =
-        getSpec()
-            .getBasicConfig()
-            .getIssuerUrl()
-            .orElseThrow(() -> new IllegalStateException("No issuer URL configured"));
+        getIssuerUrl().orElseThrow(() -> new IllegalStateException("No issuer URL configured"));
     return fetchOpenIdProviderMetadata(issuerUrl);
-  }
-
-  @Value.Lazy
-  protected Optional<MetadataDiscoveryResponse> getImpersonationOpenIdProviderMetadata() {
-    return getSpec().getImpersonationConfig().getIssuerUrl().map(this::fetchOpenIdProviderMetadata);
   }
 
   private MetadataDiscoveryResponse fetchOpenIdProviderMetadata(URI issuerUrl) {

@@ -24,8 +24,6 @@ import com.dremio.iceberg.authmgr.oauth2.OAuth2Properties.Runtime;
 import com.dremio.iceberg.authmgr.oauth2.agent.OAuth2Agent;
 import com.dremio.iceberg.authmgr.oauth2.agent.OAuth2AgentSpec;
 import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthentication;
-import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthenticator;
-import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthenticatorFactory;
 import com.dremio.iceberg.authmgr.oauth2.config.AuthorizationCodeConfig;
 import com.dremio.iceberg.authmgr.oauth2.config.BasicConfig;
 import com.dremio.iceberg.authmgr.oauth2.config.ConfigUtils;
@@ -37,8 +35,11 @@ import com.dremio.iceberg.authmgr.oauth2.config.ResourceOwnerConfig;
 import com.dremio.iceberg.authmgr.oauth2.config.RuntimeConfig;
 import com.dremio.iceberg.authmgr.oauth2.config.TokenExchangeConfig;
 import com.dremio.iceberg.authmgr.oauth2.config.TokenRefreshConfig;
-import com.dremio.iceberg.authmgr.oauth2.flow.EndpointResolver;
+import com.dremio.iceberg.authmgr.oauth2.endpoint.EndpointProvider;
+import com.dremio.iceberg.authmgr.oauth2.endpoint.EndpointProviderFactory;
 import com.dremio.iceberg.authmgr.oauth2.flow.Flow;
+import com.dremio.iceberg.authmgr.oauth2.flow.FlowContext;
+import com.dremio.iceberg.authmgr.oauth2.flow.FlowContextFactory;
 import com.dremio.iceberg.authmgr.oauth2.flow.FlowFactory;
 import com.dremio.iceberg.authmgr.oauth2.flow.FlowUtils;
 import com.dremio.iceberg.authmgr.oauth2.grant.GrantType;
@@ -87,6 +88,7 @@ import org.apache.iceberg.rest.ResourcePaths;
 import org.apache.iceberg.rest.auth.AuthProperties;
 import org.apache.iceberg.rest.auth.AuthSession;
 import org.immutables.value.Value;
+import org.testcontainers.shaded.org.checkerframework.checker.nullness.qual.Nullable;
 
 @AuthManagerImmutable
 @Value.Immutable(copy = false)
@@ -138,11 +140,6 @@ public abstract class TestEnvironment implements AutoCloseable {
   }
 
   @Value.Default
-  public boolean isDistinctImpersonationServer() {
-    return true;
-  }
-
-  @Value.Default
   public boolean isImpersonationDiscoveryEnabled() {
     return true;
   }
@@ -164,10 +161,7 @@ public abstract class TestEnvironment implements AutoCloseable {
 
   @Value.Lazy
   public HttpServer getServer() {
-    // Note: for integration tests, the test is required to provide the server root url
-    return isUnitTest()
-        ? new UnitTestHttpServer()
-        : new IntegrationTestHttpServer(getServerRootUrl());
+    return isUnitTest() ? new UnitTestHttpServer() : new IntegrationTestHttpServer();
   }
 
   @Value.Default
@@ -192,18 +186,14 @@ public abstract class TestEnvironment implements AutoCloseable {
   }
 
   @Value.Lazy
-  public EndpointResolver getEndpointResolver() {
-    return EndpointResolver.builder().spec(getAgentSpec()).restClient(getHttpClient()).build();
+  public EndpointProvider getEndpointProvider() {
+    return EndpointProviderFactory.createEndpointProvider(getAgentSpec(), getHttpClient());
   }
 
   @Value.Lazy
-  public ClientAuthenticator getClientAuthenticator() {
-    return ClientAuthenticatorFactory.createAuthenticator(getAgentSpec());
-  }
-
-  @Value.Lazy
-  public Optional<ClientAuthenticator> getImpersonatingClientAuthenticator() {
-    return ClientAuthenticatorFactory.createImpersonatingAuthenticator(getAgentSpec());
+  public EndpointProvider getImpersonatinEndpointProvider() {
+    return EndpointProviderFactory.createImpersonatingEndpointProvider(
+        getAgentSpec(), getHttpClient());
   }
 
   public void reset() {
@@ -242,7 +232,7 @@ public abstract class TestEnvironment implements AutoCloseable {
 
   @Value.Default
   public String getImpersonationServerContextPath() {
-    return isDistinctImpersonationServer() ? "/realms/other/" : getAuthorizationServerContextPath();
+    return "/realms/other/";
   }
 
   @Value.Default
@@ -305,7 +295,7 @@ public abstract class TestEnvironment implements AutoCloseable {
 
   @Value.Default
   public String getWellKnownPath() {
-    return EndpointResolver.WELL_KNOWN_PATHS.get(0);
+    return EndpointProvider.WELL_KNOWN_PATHS.get(0);
   }
 
   @Value.Default
@@ -466,20 +456,36 @@ public abstract class TestEnvironment implements AutoCloseable {
   public ImpersonationConfig getImpersonationConfig() {
     ImpersonationConfig.Builder builder = ImpersonationConfig.builder();
     if (isImpersonationEnabled()) {
-      builder.enabled(true).extraRequestParameters(Map.of("impersonation", "true"));
-      if (isDistinctImpersonationServer()) {
-        builder.clientId(TestConstants.CLIENT_ID2).scopes(List.of(TestConstants.SCOPE2));
-        if (isPrivateClient()) {
-          builder.clientSecret(TestConstants.CLIENT_SECRET2);
-        }
-        if (isImpersonationDiscoveryEnabled()) {
-          builder.issuerUrl(getImpersonationServerUrl());
-        } else {
-          builder.tokenEndpoint(getImpersonationTokenEndpoint());
-        }
+      builder
+          .enabled(true)
+          .extraRequestParameters(Map.of("impersonation", "true"))
+          .clientId(getImpersonationClientId())
+          .scopes(getImpersonationScopes());
+      if (isPrivateClient()) {
+        builder.clientSecret(getImpersonationClientSecret());
+      }
+      if (isImpersonationDiscoveryEnabled()) {
+        builder.issuerUrl(getImpersonationServerUrl());
+      } else {
+        builder.tokenEndpoint(getImpersonationTokenEndpoint());
       }
     }
     return builder.build();
+  }
+
+  @Value.Default
+  public String getImpersonationClientId() {
+    return TestConstants.CLIENT_ID2;
+  }
+
+  @Value.Default
+  public String getImpersonationClientSecret() {
+    return TestConstants.CLIENT_SECRET2;
+  }
+
+  @Value.Default
+  public List<String> getImpersonationScopes() {
+    return List.of(TestConstants.SCOPE2);
   }
 
   @Value.Default
@@ -502,6 +508,17 @@ public abstract class TestEnvironment implements AutoCloseable {
   @Value.Derived
   public PrintStream getConsole() {
     return getUser().getConsole();
+  }
+
+  @Value.Lazy
+  public FlowContext getFlowContext() {
+    return FlowContextFactory.createFlowContext(getAgentSpec(), getHttpClient());
+  }
+
+  @Value.Lazy
+  @Nullable
+  public FlowContext getImpersonationFlowContext() {
+    return FlowContextFactory.createImpersonationFlowContext(getAgentSpec(), getHttpClient());
   }
 
   @Value.Default
@@ -585,24 +602,17 @@ public abstract class TestEnvironment implements AutoCloseable {
   }
 
   public Flow newInitialTokenFetchFlow() {
-    Flow flow =
-        FlowFactory.forInitialTokenFetch(
-            getAgentSpec(), getHttpClient(), getEndpointResolver(), getClientAuthenticator());
+    Flow flow = FlowFactory.forInitialTokenFetch(getGrantType(), getFlowContext());
     getUser().setErrorListener(error -> flow.close());
     return flow;
   }
 
   public Flow newTokenRefreshFlow() {
-    return FlowFactory.forTokenRefresh(
-        getAgentSpec(), getHttpClient(), getEndpointResolver(), getClientAuthenticator());
+    return FlowFactory.forTokenRefresh(getDialect(), getFlowContext());
   }
 
   public Flow newImpersonationFlow() {
-    return FlowFactory.forImpersonation(
-        getAgentSpec(),
-        getHttpClient(),
-        getEndpointResolver(),
-        getImpersonatingClientAuthenticator().orElseGet(this::getClientAuthenticator));
+    return FlowFactory.forImpersonation(getImpersonationFlowContext());
   }
 
   public void createExpectations() {

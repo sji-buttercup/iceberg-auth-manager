@@ -16,11 +16,13 @@
 package com.dremio.iceberg.authmgr.oauth2.test.container;
 
 import com.dremio.iceberg.authmgr.oauth2.config.TokenExchangeConfig;
-import com.dremio.iceberg.authmgr.oauth2.test.ImmutableTestEnvironment.Builder;
+import com.dremio.iceberg.authmgr.oauth2.test.ImmutableTestEnvironment;
+import com.dremio.iceberg.authmgr.oauth2.test.TestConstants;
 import com.dremio.iceberg.authmgr.oauth2.test.TestEnvironment;
 import com.dremio.iceberg.authmgr.oauth2.test.TestEnvironmentExtension;
 import com.dremio.iceberg.authmgr.oauth2.token.provider.TokenProviders;
 import java.time.Clock;
+import java.util.List;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -48,7 +50,7 @@ public class KeycloakContainerExtension extends TestEnvironmentExtension
   }
 
   @Override
-  protected Builder newTestEnvironmentBuilder(ExtensionContext context) {
+  protected ImmutableTestEnvironment.Builder newTestEnvironmentBuilder(ExtensionContext context) {
     KeycloakContainer keycloak =
         context
             .getStore(ExtensionContext.Namespace.GLOBAL)
@@ -58,11 +60,15 @@ public class KeycloakContainerExtension extends TestEnvironmentExtension
         .clock(Clock.systemUTC())
         .serverRootUrl(keycloak.getRootUrl())
         .authorizationServerUrl(keycloak.getIssuerUrl())
-        .distinctImpersonationServer(false)
+        .impersonationServerUrl(keycloak.getIssuerUrl())
         .tokenEndpoint(keycloak.getTokenEndpoint())
+        .impersonationTokenEndpoint(keycloak.getTokenEndpoint())
         .authorizationEndpoint(keycloak.getAuthEndpoint())
         .deviceAuthorizationEndpoint(keycloak.getDeviceAuthEndpoint())
         .accessTokenLifespan(keycloak.getAccessTokenLifespan())
+        .impersonationClientId(TestConstants.CLIENT_ID1)
+        .impersonationClientSecret(TestConstants.CLIENT_SECRET1)
+        .impersonationScopes(List.of(TestConstants.SCOPE1))
         .tokenExchangeConfig(
             TokenExchangeConfig.builder()
                 .subjectTokenProvider(TokenProviders.CURRENT_ACCESS_TOKEN)

@@ -15,8 +15,6 @@
  */
 package com.dremio.iceberg.authmgr.oauth2.flow;
 
-import com.dremio.iceberg.authmgr.oauth2.agent.OAuth2AgentSpec;
-import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthenticator;
 import com.dremio.iceberg.authmgr.oauth2.config.TokenExchangeConfig;
 import com.dremio.iceberg.authmgr.oauth2.rest.TokenExchangeRequest;
 import com.dremio.iceberg.authmgr.oauth2.token.AccessToken;
@@ -24,7 +22,6 @@ import com.dremio.iceberg.authmgr.oauth2.token.Tokens;
 import com.dremio.iceberg.authmgr.oauth2.token.TypedToken;
 import jakarta.annotation.Nullable;
 import java.util.Objects;
-import org.apache.iceberg.rest.RESTClient;
 
 /**
  * An implementation of the <a href="https://datatracker.ietf.org/doc/html/rfc8693">Token
@@ -34,13 +31,9 @@ class TokenExchangeFlow extends AbstractFlow {
 
   private final TokenExchangeConfig tokenExchangeConfig;
 
-  TokenExchangeFlow(
-      OAuth2AgentSpec spec,
-      RESTClient restClient,
-      EndpointResolver endpointResolver,
-      ClientAuthenticator clientAuthenticator) {
-    super(spec, restClient, endpointResolver, clientAuthenticator);
-    tokenExchangeConfig = spec.getTokenExchangeConfig();
+  TokenExchangeFlow(FlowContext context) {
+    super(context);
+    tokenExchangeConfig = context.getTokenExchangeConfig();
   }
 
   @Override

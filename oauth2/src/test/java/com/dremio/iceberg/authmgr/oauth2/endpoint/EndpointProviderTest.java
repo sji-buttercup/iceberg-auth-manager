@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.dremio.iceberg.authmgr.oauth2.flow;
+package com.dremio.iceberg.authmgr.oauth2.endpoint;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.assertj.core.api.InstanceOfAssertFactories.throwable;
 
+import com.dremio.iceberg.authmgr.oauth2.flow.OAuth2Exception;
 import com.dremio.iceberg.authmgr.oauth2.rest.MetadataDiscoveryResponse;
 import com.dremio.iceberg.authmgr.oauth2.test.TestEnvironment;
 import com.dremio.iceberg.authmgr.oauth2.test.server.UnitTestHttpServer;
@@ -34,7 +35,7 @@ import org.mockserver.model.HttpResponse;
 import org.mockserver.model.JsonBody;
 import org.mockserver.model.MediaType;
 
-class EndpointResolverTest {
+class EndpointProviderTest {
 
   private static final String INVALID_METADATA =
       "{"
@@ -44,15 +45,19 @@ class EndpointResolverTest {
 
   @Test
   void withoutDiscovery() {
-    try (TestEnvironment env = TestEnvironment.builder().discoveryEnabled(false).build()) {
-      EndpointResolver endpointResolver = env.getEndpointResolver();
-      assertThat(endpointResolver.getResolvedTokenEndpoint()).isEqualTo(env.getTokenEndpoint());
-      assertThat(endpointResolver.getResolvedAuthorizationEndpoint())
+    try (TestEnvironment env =
+        TestEnvironment.builder().discoveryEnabled(false).impersonationEnabled(true).build()) {
+      // primary
+      EndpointProvider endpointProvider = env.getEndpointProvider();
+      assertThat(endpointProvider.getResolvedTokenEndpoint()).isEqualTo(env.getTokenEndpoint());
+      assertThat(endpointProvider.getResolvedAuthorizationEndpoint())
           .isEqualTo(env.getAuthorizationEndpoint());
-      assertThat(endpointResolver.getResolvedDeviceAuthorizationEndpoint())
+      assertThat(endpointProvider.getResolvedDeviceAuthorizationEndpoint())
           .isEqualTo(env.getDeviceAuthorizationEndpoint());
-      assertThat(endpointResolver.getResolvedImpersonationTokenEndpoint())
-          .isEqualTo(endpointResolver.getResolvedTokenEndpoint());
+      // impersonation
+      EndpointProvider impersonatinEndpointProvider = env.getImpersonatinEndpointProvider();
+      assertThat(impersonatinEndpointProvider.getResolvedTokenEndpoint())
+          .isEqualTo(env.getImpersonationTokenEndpoint());
     }
   }
 
@@ -61,53 +66,37 @@ class EndpointResolverTest {
   void withDiscovery(boolean includeDeviceAuthEndpoint) {
     try (TestEnvironment env =
         TestEnvironment.builder()
+            .impersonationEnabled(true)
             .includeDeviceAuthEndpointInDiscoveryMetadata(includeDeviceAuthEndpoint)
             .build()) {
-      EndpointResolver endpointResolver = env.getEndpointResolver();
-      assertThat(endpointResolver.getResolvedTokenEndpoint()).isEqualTo(env.getTokenEndpoint());
-      assertThat(endpointResolver.getResolvedAuthorizationEndpoint())
+      // primary
+      EndpointProvider endpointProvider = env.getEndpointProvider();
+      assertThat(endpointProvider.getResolvedTokenEndpoint()).isEqualTo(env.getTokenEndpoint());
+      assertThat(endpointProvider.getResolvedAuthorizationEndpoint())
           .isEqualTo(env.getAuthorizationEndpoint());
       if (includeDeviceAuthEndpoint) {
-        assertThat(endpointResolver.getResolvedDeviceAuthorizationEndpoint())
+        assertThat(endpointProvider.getResolvedDeviceAuthorizationEndpoint())
             .isEqualTo(env.getDeviceAuthorizationEndpoint());
       } else {
-        assertThatThrownBy(endpointResolver::getResolvedDeviceAuthorizationEndpoint)
+        assertThatThrownBy(endpointProvider::getResolvedDeviceAuthorizationEndpoint)
             .isInstanceOf(IllegalStateException.class)
             .hasMessage(
                 "OpenID provider metadata does not contain a device authorization endpoint");
       }
-      assertThat(endpointResolver.getResolvedImpersonationTokenEndpoint())
-          .isEqualTo(endpointResolver.getResolvedTokenEndpoint());
-    }
-  }
-
-  @ParameterizedTest
-  @CsvSource({
-    "true, true, true",
-    "true, false, true",
-    "true, false, false",
-    "false, true, true",
-    "false, false, true",
-    "false, false, false"
-  })
-  void withImpersonation(
-      boolean discoveryPrimary, boolean discoverySecondary, boolean distinctServer) {
-    try (TestEnvironment env =
-        TestEnvironment.builder()
-            .impersonationEnabled(true)
-            .discoveryEnabled(discoveryPrimary)
-            .impersonationDiscoveryEnabled(discoverySecondary)
-            .distinctImpersonationServer(distinctServer)
-            .build()) {
-      EndpointResolver endpointResolver = env.getEndpointResolver();
-      assertThat(endpointResolver.getResolvedTokenEndpoint()).isEqualTo(env.getTokenEndpoint());
-      if (distinctServer) {
-        assertThat(endpointResolver.getResolvedImpersonationTokenEndpoint())
-            .isNotEqualTo(endpointResolver.getResolvedTokenEndpoint())
-            .isEqualTo(env.getImpersonationTokenEndpoint());
+      // impersonation
+      endpointProvider = env.getImpersonatinEndpointProvider();
+      assertThat(endpointProvider.getResolvedTokenEndpoint())
+          .isEqualTo(env.getImpersonationTokenEndpoint());
+      assertThat(endpointProvider.getResolvedAuthorizationEndpoint())
+          .isEqualTo(env.getAuthorizationEndpoint());
+      if (includeDeviceAuthEndpoint) {
+        assertThat(endpointProvider.getResolvedDeviceAuthorizationEndpoint())
+            .isEqualTo(env.getDeviceAuthorizationEndpoint());
       } else {
-        assertThat(endpointResolver.getResolvedImpersonationTokenEndpoint())
-            .isEqualTo(endpointResolver.getResolvedTokenEndpoint());
+        assertThatThrownBy(endpointProvider::getResolvedDeviceAuthorizationEndpoint)
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage(
+                "OpenID provider metadata does not contain a device authorization endpoint");
       }
     }
   }
@@ -128,9 +117,20 @@ class EndpointResolverTest {
         TestEnvironment.builder()
             .authorizationServerContextPath(contextPath)
             .wellKnownPath(wellKnownPath)
+            .impersonationEnabled(true)
+            .impersonationServerContextPath(contextPath)
             .build()) {
-      EndpointResolver endpointResolver = env.getEndpointResolver();
-      MetadataDiscoveryResponse actual = endpointResolver.getOpenIdProviderMetadata();
+      // primary
+      EndpointProvider endpointProvider = env.getEndpointProvider();
+      MetadataDiscoveryResponse actual = endpointProvider.getOpenIdProviderMetadata();
+      assertThat(actual.getIssuerUrl()).isEqualTo(env.getAuthorizationServerUrl());
+      assertThat(actual.getTokenEndpoint()).isEqualTo(env.getTokenEndpoint());
+      assertThat(actual.getAuthorizationEndpoint()).isEqualTo(env.getAuthorizationEndpoint());
+      assertThat(actual.getDeviceAuthorizationEndpoint())
+          .isEqualTo(env.getDeviceAuthorizationEndpoint());
+      // impersonation
+      endpointProvider = env.getImpersonatinEndpointProvider();
+      actual = endpointProvider.getOpenIdProviderMetadata();
       assertThat(actual.getIssuerUrl()).isEqualTo(env.getAuthorizationServerUrl());
       assertThat(actual.getTokenEndpoint()).isEqualTo(env.getTokenEndpoint());
       assertThat(actual.getAuthorizationEndpoint()).isEqualTo(env.getAuthorizationEndpoint());
@@ -143,8 +143,8 @@ class EndpointResolverTest {
   void fetchOpenIdProviderMetadataWrongEndpoint() {
     try (TestEnvironment env = TestEnvironment.builder().createDefaultExpectations(false).build()) {
       env.createErrorExpectations();
-      EndpointResolver endpointResolver = env.getEndpointResolver();
-      Throwable e = catchThrowable(endpointResolver::getOpenIdProviderMetadata);
+      EndpointProvider endpointProvider = env.getEndpointProvider();
+      Throwable e = catchThrowable(endpointProvider::getOpenIdProviderMetadata);
       assertThat(e)
           .isInstanceOf(RESTException.class)
           .hasMessageContaining("Failed to fetch OpenID provider metadata");
@@ -177,8 +177,8 @@ class EndpointResolverTest {
                   .withStatusCode(200)
                   .withContentType(MediaType.APPLICATION_JSON)
                   .withBody(JsonBody.json(INVALID_METADATA)));
-      EndpointResolver endpointResolver = env.getEndpointResolver();
-      Throwable e = catchThrowable(endpointResolver::getOpenIdProviderMetadata);
+      EndpointProvider endpointProvider = env.getEndpointProvider();
+      Throwable e = catchThrowable(endpointProvider::getOpenIdProviderMetadata);
       // first well-known path
       assertThat(e)
           .isInstanceOf(RESTException.class)

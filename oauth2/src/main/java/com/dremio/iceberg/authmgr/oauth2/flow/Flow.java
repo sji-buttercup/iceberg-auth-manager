@@ -18,8 +18,26 @@ package com.dremio.iceberg.authmgr.oauth2.flow;
 import com.dremio.iceberg.authmgr.oauth2.token.Tokens;
 import jakarta.annotation.Nullable;
 
+/**
+ * An interface representing an OAuth2 flow. A flow is used to fetch new tokens from the OAuth2
+ * provider.
+ *
+ * <p>A flow is a short-lived component that represents a set of interactions (generally one, but
+ * sometimes more) between the agent and the server, in order to obtain access tokens.
+ *
+ * <p>A flow may be stateful or stateless. This interface extends AutoCloseable, allowing stateful
+ * flows to be closed when tokens were fetched. This is useful for cleaning up resources or
+ * releasing connections.
+ */
 public interface Flow extends AutoCloseable {
 
+  /**
+   * Fetches new tokens from the OAuth2 provider. This method is called when the current tokens are
+   * expired or about to expire, and new tokens are needed.
+   *
+   * @param currentTokens The current tokens. This can be null if no tokens are available.
+   * @return The new tokens fetched from the OAuth2 provider.
+   */
   Tokens fetchNewTokens(@Nullable Tokens currentTokens);
 
   @Override

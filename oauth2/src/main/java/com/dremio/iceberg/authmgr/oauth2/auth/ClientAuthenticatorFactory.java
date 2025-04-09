@@ -17,7 +17,6 @@ package com.dremio.iceberg.authmgr.oauth2.auth;
 
 import com.dremio.iceberg.authmgr.oauth2.agent.OAuth2AgentSpec;
 import com.dremio.iceberg.authmgr.oauth2.config.Dialect;
-import java.util.Optional;
 
 public final class ClientAuthenticatorFactory {
 
@@ -51,30 +50,23 @@ public final class ClientAuthenticatorFactory {
     }
   }
 
-  public static Optional<ClientAuthenticator> createImpersonatingAuthenticator(
-      OAuth2AgentSpec spec) {
-    if (spec.getImpersonationConfig().getClientId().isEmpty()) {
-      return Optional.empty();
-    }
+  public static ClientAuthenticator createImpersonatingAuthenticator(OAuth2AgentSpec spec) {
     ClientAuthentication method = spec.getImpersonationConfig().getClientAuthentication();
     switch (method) {
       case NONE:
-        return Optional.of(
-            ImmutablePublicClientAuthenticator.builder()
-                .clientId(spec.getImpersonationConfig().getClientId().orElseThrow())
-                .build());
+        return ImmutablePublicClientAuthenticator.builder()
+            .clientId(spec.getImpersonationConfig().getClientId().orElseThrow())
+            .build();
       case CLIENT_SECRET_BASIC:
-        return Optional.of(
-            ImmutableClientSecretBasicAuthenticator.builder()
-                .clientId(spec.getImpersonationConfig().getClientId().orElseThrow())
-                .clientSecret(spec.getImpersonationConfig().getClientSecret().orElseThrow())
-                .build());
+        return ImmutableClientSecretBasicAuthenticator.builder()
+            .clientId(spec.getImpersonationConfig().getClientId().orElseThrow())
+            .clientSecret(spec.getImpersonationConfig().getClientSecret().orElseThrow())
+            .build();
       case CLIENT_SECRET_POST:
-        return Optional.of(
-            ImmutableClientSecretPostAuthenticator.builder()
-                .clientId(spec.getImpersonationConfig().getClientId().orElseThrow())
-                .clientSecret(spec.getImpersonationConfig().getClientSecret().orElseThrow())
-                .build());
+        return ImmutableClientSecretPostAuthenticator.builder()
+            .clientId(spec.getImpersonationConfig().getClientId().orElseThrow())
+            .clientSecret(spec.getImpersonationConfig().getClientSecret().orElseThrow())
+            .build();
       default:
         throw new IllegalArgumentException("Unsupported client authentication method: " + method);
     }

@@ -255,7 +255,7 @@ public interface BasicConfig {
               getClientSecret().isPresent(),
               List.of(CLIENT_AUTH, CLIENT_SECRET),
               "client secret must not be empty when client authentication is '%s'",
-              ClientAuthentication.CLIENT_SECRET_BASIC.getCanonicalName());
+              getClientAuthentication().getCanonicalName());
         } else {
           validator.check(
               getClientSecret().isPresent() || getGrantType() != GrantType.CLIENT_CREDENTIALS,

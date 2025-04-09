@@ -18,6 +18,7 @@ package com.dremio.iceberg.authmgr.oauth2.test.container;
 import com.dremio.iceberg.authmgr.oauth2.test.TestConstants;
 import java.net.URI;
 import java.time.Duration;
+import org.apache.iceberg.rest.ResourcePaths;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
@@ -32,7 +33,6 @@ public class PolarisContainer implements AutoCloseable {
 
   private final GenericContainer<?> polaris;
   private final URI baseUri;
-  private final URI tokenEndpoint;
 
   @SuppressWarnings("resource")
   public PolarisContainer() {
@@ -57,7 +57,6 @@ public class PolarisContainer implements AutoCloseable {
             .withEnv("quarkus.log.category.\"org.apache.polaris\".level", getPolarisLoggerLevel());
     polaris.start();
     baseUri = URI.create("http://localhost:" + polaris.getMappedPort(8181));
-    tokenEndpoint = baseUri.resolve("/api/catalog/v1/oauth/tokens");
   }
 
   public URI baseUri() {
@@ -65,7 +64,8 @@ public class PolarisContainer implements AutoCloseable {
   }
 
   public URI getTokenEndpoint() {
-    return tokenEndpoint;
+    // use relative path
+    return URI.create(ResourcePaths.tokens());
   }
 
   public Duration getAccessTokenLifespan() {

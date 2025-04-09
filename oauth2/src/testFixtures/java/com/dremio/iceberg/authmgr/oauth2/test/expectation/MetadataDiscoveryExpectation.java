@@ -55,6 +55,9 @@ public abstract class MetadataDiscoveryExpectation extends AbstractExpectation {
               .issuerUrl(issuerUrl)
               .tokenEndpoint(getTestEnvironment().getImpersonationTokenEndpoint())
               .authorizationEndpoint(getTestEnvironment().getAuthorizationEndpoint());
+      if (getTestEnvironment().isIncludeDeviceAuthEndpointInDiscoveryMetadata()) {
+        builder.deviceAuthorizationEndpoint(getTestEnvironment().getDeviceAuthorizationEndpoint());
+      }
       getClientAndServer()
           .when(
               HttpRequest.request()

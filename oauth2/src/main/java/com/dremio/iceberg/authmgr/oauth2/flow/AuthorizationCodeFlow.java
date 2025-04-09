@@ -20,9 +20,7 @@ import static com.dremio.iceberg.authmgr.oauth2.flow.FlowUtils.OAUTH2_AGENT_TITL
 import static java.net.HttpURLConnection.HTTP_OK;
 import static java.net.HttpURLConnection.HTTP_UNAUTHORIZED;
 
-import com.dremio.iceberg.authmgr.oauth2.agent.OAuth2AgentSpec;
-import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthenticator;
-import com.dremio.iceberg.authmgr.oauth2.config.ConfigUtils;
+import com.dremio.iceberg.authmgr.oauth2.config.AuthorizationCodeConfig;
 import com.dremio.iceberg.authmgr.oauth2.config.PkceTransformation;
 import com.dremio.iceberg.authmgr.oauth2.rest.AuthorizationCodeTokenRequest;
 import com.dremio.iceberg.authmgr.oauth2.token.Tokens;
@@ -48,7 +46,6 @@ import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.iceberg.exceptions.RESTException;
-import org.apache.iceberg.rest.RESTClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -106,49 +103,45 @@ class AuthorizationCodeFlow extends AbstractFlow {
   private final Phaser inflightRequestsPhaser = new Phaser(1);
 
   @SuppressWarnings("FutureReturnValueIgnored")
-  AuthorizationCodeFlow(
-      OAuth2AgentSpec spec,
-      RESTClient restClient,
-      EndpointResolver endpointResolver,
-      ClientAuthenticator clientAuthenticator) {
-    super(spec, restClient, endpointResolver, clientAuthenticator);
-    console = spec.getRuntimeConfig().getConsole();
-    msgPrefix = FlowUtils.getMsgPrefix(spec.getRuntimeConfig().getAgentName());
-    flowTimeout = spec.getAuthorizationCodeConfig().getTimeout();
+  AuthorizationCodeFlow(FlowContext context) {
+    super(context);
+    console = context.getRuntimeConfig().getConsole();
+    msgPrefix = FlowUtils.getMsgPrefix(context.getRuntimeConfig().getAgentName());
+    AuthorizationCodeConfig authorizationCodeConfig = context.getAuthorizationCodeConfig();
+    flowTimeout = authorizationCodeConfig.getTimeout();
     tokensFuture =
         redirectUriFuture
             .thenApply(this::extractAuthorizationCode)
             .thenApply(this::fetchNewTokens)
             .whenComplete((tokens, error) -> log(error));
     closeFuture.thenRun(this::doClose);
-    String bindHost = spec.getAuthorizationCodeConfig().getCallbackBindHost();
+    String bindHost = authorizationCodeConfig.getCallbackBindHost();
     String contextPath =
-        spec.getAuthorizationCodeConfig()
+        authorizationCodeConfig
             .getCallbackContextPath()
-            .orElseGet(() -> FlowUtils.getContextPath(spec.getRuntimeConfig().getAgentName()));
+            .orElseGet(() -> FlowUtils.getContextPath(context.getRuntimeConfig().getAgentName()));
     server =
         createServer(
             bindHost,
-            spec.getAuthorizationCodeConfig().getCallbackBindPort().orElse(0),
+            authorizationCodeConfig.getCallbackBindPort().orElse(0),
             contextPath,
             this::doRequest);
     state = FlowUtils.randomAlphaNumString(STATE_LENGTH);
     redirectUri =
-        spec.getAuthorizationCodeConfig()
+        authorizationCodeConfig
             .getRedirectUri()
             .orElseGet(
                 () -> defaultRedirectUri(bindHost, server.getAddress().getPort(), contextPath));
     UriBuilder authorizationUriBuilder =
-        new UriBuilder(endpointResolver.getResolvedAuthorizationEndpoint())
+        new UriBuilder(context.getEndpointProvider().getResolvedAuthorizationEndpoint())
             .queryParam("response_type", "code")
-            .queryParam("client_id", spec.getBasicConfig().getClientId().orElseThrow())
-            .queryParam(
-                "scope", ConfigUtils.scopesAsString(spec.getBasicConfig().getScopes()).orElse(null))
+            .queryParam("client_id", context.getClientId().orElseThrow())
+            .queryParam("scope", context.getScopesAsString().orElse(null))
             .queryParam("redirect_uri", redirectUri.toString())
             .queryParam("state", state);
-    if (spec.getAuthorizationCodeConfig().isPkceEnabled()) {
+    if (authorizationCodeConfig.isPkceEnabled()) {
       codeVerifier = FlowUtils.generateCodeVerifier();
-      PkceTransformation transformation = spec.getAuthorizationCodeConfig().getPkceTransformation();
+      PkceTransformation transformation = authorizationCodeConfig.getPkceTransformation();
       String codeChallenge = FlowUtils.generateCodeChallenge(transformation, codeVerifier);
       authorizationUriBuilder
           .queryParam("code_challenge", codeChallenge)
