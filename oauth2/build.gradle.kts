@@ -53,8 +53,15 @@ dependencies {
 
   testFixturesApi(libs.assertj.core)
   testFixturesApi(libs.mockito.core)
+
   testFixturesApi(libs.mockserver.netty)
   testFixturesApi(libs.mockserver.client.java)
+
+  testFixturesApi(platform(libs.testcontainers.bom))
+  testFixturesApi("org.testcontainers:testcontainers")
+  testFixturesApi("org.testcontainers:junit-jupiter")
+  testFixturesApi(libs.keycloak.admin.client)
+  testFixturesApi(libs.testcontainers.keycloak)
 
   testFixturesCompileOnly(project(":authmgr-immutables"))
   testFixturesAnnotationProcessor(project(":authmgr-immutables", configuration = "processor"))
@@ -65,14 +72,7 @@ dependencies {
   testCompileOnly(project(":authmgr-immutables"))
   testAnnotationProcessor(project(":authmgr-immutables", configuration = "processor"))
 
-  intTestImplementation(platform(libs.testcontainers.bom))
-  intTestImplementation("org.testcontainers:testcontainers")
-  intTestImplementation("org.testcontainers:junit-jupiter")
   intTestImplementation(libs.auth0.jwt)
-  intTestImplementation(libs.keycloak.admin.client)
-  intTestImplementation(libs.testcontainers.keycloak) {
-    exclude(group = "org.slf4j") // uses SLF4J 2.x, we are not ready yet
-  }
 
   intTestCompileOnly(project(":authmgr-immutables"))
   intTestAnnotationProcessor(project(":authmgr-immutables", configuration = "processor"))

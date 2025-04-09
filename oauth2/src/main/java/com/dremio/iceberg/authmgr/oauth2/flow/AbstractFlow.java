@@ -16,12 +16,12 @@
 package com.dremio.iceberg.authmgr.oauth2.flow;
 
 import com.dremio.iceberg.authmgr.oauth2.agent.OAuth2AgentSpec;
-import com.dremio.iceberg.authmgr.oauth2.rest.ClientRequest;
+import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthenticator;
+import com.dremio.iceberg.authmgr.oauth2.config.ConfigUtils;
 import com.dremio.iceberg.authmgr.oauth2.rest.DeviceAuthorizationRequest;
 import com.dremio.iceberg.authmgr.oauth2.rest.DeviceAuthorizationResponse;
 import com.dremio.iceberg.authmgr.oauth2.rest.PostFormRequest;
 import com.dremio.iceberg.authmgr.oauth2.rest.TokenRequest;
-import com.dremio.iceberg.authmgr.oauth2.rest.TokenRequest.Builder;
 import com.dremio.iceberg.authmgr.oauth2.rest.TokenResponse;
 import com.dremio.iceberg.authmgr.oauth2.token.Tokens;
 import jakarta.annotation.Nullable;
@@ -76,12 +76,17 @@ abstract class AbstractFlow implements Flow {
   private final OAuth2AgentSpec spec;
   private final RESTClient restClient;
   private final EndpointResolver endpointResolver;
+  private final ClientAuthenticator clientAuthenticator;
 
   protected AbstractFlow(
-      OAuth2AgentSpec spec, RESTClient restClient, EndpointResolver endpointResolver) {
+      OAuth2AgentSpec spec,
+      RESTClient restClient,
+      EndpointResolver endpointResolver,
+      ClientAuthenticator clientAuthenticator) {
     this.spec = spec;
     this.restClient = restClient;
     this.endpointResolver = endpointResolver;
+    this.clientAuthenticator = clientAuthenticator;
   }
 
   protected URI getResolvedTokenEndpoint() {
@@ -93,62 +98,51 @@ abstract class AbstractFlow implements Flow {
   }
 
   protected Optional<String> getScopesAsString() {
-    return FlowUtils.scopesAsString(spec.getBasicConfig().getScopes());
-  }
-
-  protected ServiceAccount getServiceAccount() {
-    return spec.getBasicConfig();
+    return ConfigUtils.scopesAsString(spec.getBasicConfig().getScopes());
   }
 
   protected <REQ extends TokenRequest> Tokens invokeTokenEndpoint(
-      @Nullable Tokens currentTokens, Builder<REQ, ?> builder) {
+      @Nullable Tokens currentTokens, TokenRequest.Builder<REQ, ?> builder) {
+    URI tokenEndpoint = getResolvedTokenEndpoint();
     builder.extraParameters(getExtraRequestParameters());
     getScopesAsString().ifPresent(builder::scope);
-    prepareRequestBody(builder);
+    Map<String, String> headers = getHeaders();
+    clientAuthenticator.authenticate(builder, headers, currentTokens);
     REQ request = builder.build();
     LOGGER.debug("Invoking token endpoint: {}", request);
     TokenResponse response =
         restClient.postForm(
-            getResolvedTokenEndpoint().toString(),
+            tokenEndpoint.toString(),
             request.asFormParameters(),
             TokenResponse.class,
-            getHeaders(currentTokens),
+            headers,
             FlowErrorHandler.INSTANCE);
     LOGGER.debug("Token endpoint response: {}", response);
     return response.asTokens(spec.getRuntimeConfig().getClock());
   }
 
   protected DeviceAuthorizationResponse invokeDeviceAuthEndpoint(@Nullable Tokens currentTokens) {
+    URI deviceAuthorizationEndpoint = endpointResolver.getResolvedDeviceAuthorizationEndpoint();
     DeviceAuthorizationRequest.Builder builder = DeviceAuthorizationRequest.builder();
     getScopesAsString().ifPresent(builder::scope);
-    prepareRequestBody(builder);
+    Map<String, String> headers = getHeaders();
+    clientAuthenticator.authenticate(builder, headers, currentTokens);
     DeviceAuthorizationRequest request = builder.build();
     LOGGER.debug("Invoking device auth endpoint: {}", request);
     DeviceAuthorizationResponse response =
         restClient.postForm(
-            endpointResolver.getResolvedDeviceAuthorizationEndpoint().toString(),
+            deviceAuthorizationEndpoint.toString(),
             request.asFormParameters(),
             DeviceAuthorizationResponse.class,
-            getHeaders(currentTokens),
+            headers,
             FlowErrorHandler.INSTANCE);
     LOGGER.debug("Device auth endpoint response: {}", response);
     return response;
   }
 
-  protected <REQ extends ClientRequest> void prepareRequestBody(
-      ClientRequest.Builder<REQ, ?> request) {
-    ServiceAccount idAndSecret = getServiceAccount();
-    if (idAndSecret.isPublicClient()) {
-      idAndSecret.getClientId().ifPresent(request::clientId);
-    }
-  }
-
-  protected Map<String, String> getHeaders(@Nullable Tokens currentTokens) {
+  protected Map<String, String> getHeaders() {
     Map<String, String> headers = new HashMap<>();
     headers.put("Content-Type", PostFormRequest.CONTENT_TYPE);
-    getServiceAccount()
-        .asBasicAuthHeader()
-        .ifPresent(header -> headers.put("Authorization", header));
     return headers;
   }
 }

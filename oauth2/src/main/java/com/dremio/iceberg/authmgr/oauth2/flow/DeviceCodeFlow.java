@@ -19,6 +19,7 @@ import static com.dremio.iceberg.authmgr.oauth2.flow.FlowUtils.OAUTH2_AGENT_OPEN
 import static com.dremio.iceberg.authmgr.oauth2.flow.FlowUtils.OAUTH2_AGENT_TITLE;
 
 import com.dremio.iceberg.authmgr.oauth2.agent.OAuth2AgentSpec;
+import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthenticator;
 import com.dremio.iceberg.authmgr.oauth2.rest.DeviceAccessTokenRequest;
 import com.dremio.iceberg.authmgr.oauth2.rest.DeviceAuthorizationResponse;
 import com.dremio.iceberg.authmgr.oauth2.token.Tokens;
@@ -70,8 +71,12 @@ class DeviceCodeFlow extends AbstractFlow {
   private volatile Future<?> pollFuture;
 
   @SuppressWarnings("FutureReturnValueIgnored")
-  DeviceCodeFlow(OAuth2AgentSpec spec, RESTClient restClient, EndpointResolver endpointResolver) {
-    super(spec, restClient, endpointResolver);
+  DeviceCodeFlow(
+      OAuth2AgentSpec spec,
+      RESTClient restClient,
+      EndpointResolver endpointResolver,
+      ClientAuthenticator clientAuthenticator) {
+    super(spec, restClient, endpointResolver, clientAuthenticator);
     console = spec.getRuntimeConfig().getConsole();
     msgPrefix = FlowUtils.getMsgPrefix(spec.getRuntimeConfig().getAgentName());
     flowTimeout = spec.getDeviceCodeConfig().getTimeout();

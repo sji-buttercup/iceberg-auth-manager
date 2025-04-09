@@ -13,30 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.dremio.iceberg.authmgr.oauth2.config;
+package com.dremio.iceberg.authmgr.oauth2.auth;
 
-import java.util.Locale;
+import com.dremio.iceberg.authmgr.oauth2.config.Secret;
 
-public enum PkceTransformation {
-  S256("S256"),
-  PLAIN("plain"),
-  ;
+/** An authenticator for clients in possession of a client secret. */
+public interface ClientSecretAuthenticator extends StandardClientAuthenticator {
 
-  private final String canonicalName;
-
-  PkceTransformation(String canonicalName) {
-    this.canonicalName = canonicalName;
-  }
-
-  public String getCanonicalName() {
-    return canonicalName;
-  }
-
-  public static PkceTransformation fromConfigName(String name) {
-    try {
-      return valueOf(name.toUpperCase(Locale.ROOT));
-    } catch (IllegalArgumentException ignore) {
-      throw new IllegalArgumentException("Unknown OAuth2 dialect: " + name);
-    }
-  }
+  Secret getClientSecret();
 }

@@ -21,6 +21,8 @@ import static java.net.HttpURLConnection.HTTP_OK;
 import static java.net.HttpURLConnection.HTTP_UNAUTHORIZED;
 
 import com.dremio.iceberg.authmgr.oauth2.agent.OAuth2AgentSpec;
+import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthenticator;
+import com.dremio.iceberg.authmgr.oauth2.config.ConfigUtils;
 import com.dremio.iceberg.authmgr.oauth2.config.PkceTransformation;
 import com.dremio.iceberg.authmgr.oauth2.rest.AuthorizationCodeTokenRequest;
 import com.dremio.iceberg.authmgr.oauth2.token.Tokens;
@@ -105,8 +107,11 @@ class AuthorizationCodeFlow extends AbstractFlow {
 
   @SuppressWarnings("FutureReturnValueIgnored")
   AuthorizationCodeFlow(
-      OAuth2AgentSpec spec, RESTClient restClient, EndpointResolver endpointResolver) {
-    super(spec, restClient, endpointResolver);
+      OAuth2AgentSpec spec,
+      RESTClient restClient,
+      EndpointResolver endpointResolver,
+      ClientAuthenticator clientAuthenticator) {
+    super(spec, restClient, endpointResolver, clientAuthenticator);
     console = spec.getRuntimeConfig().getConsole();
     msgPrefix = FlowUtils.getMsgPrefix(spec.getRuntimeConfig().getAgentName());
     flowTimeout = spec.getAuthorizationCodeConfig().getTimeout();
@@ -138,13 +143,13 @@ class AuthorizationCodeFlow extends AbstractFlow {
             .queryParam("response_type", "code")
             .queryParam("client_id", spec.getBasicConfig().getClientId().orElseThrow())
             .queryParam(
-                "scope", FlowUtils.scopesAsString(spec.getBasicConfig().getScopes()).orElse(null))
+                "scope", ConfigUtils.scopesAsString(spec.getBasicConfig().getScopes()).orElse(null))
             .queryParam("redirect_uri", redirectUri.toString())
             .queryParam("state", state);
     if (spec.getAuthorizationCodeConfig().isPkceEnabled()) {
       codeVerifier = FlowUtils.generateCodeVerifier();
       PkceTransformation transformation = spec.getAuthorizationCodeConfig().getPkceTransformation();
-      String codeChallenge = transformation.transform(codeVerifier);
+      String codeChallenge = FlowUtils.generateCodeChallenge(transformation, codeVerifier);
       authorizationUriBuilder
           .queryParam("code_challenge", codeChallenge)
           .queryParam("code_challenge_method", transformation.getCanonicalName())

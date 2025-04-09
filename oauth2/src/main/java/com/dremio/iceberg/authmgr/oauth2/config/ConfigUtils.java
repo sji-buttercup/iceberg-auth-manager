@@ -15,28 +15,17 @@
  */
 package com.dremio.iceberg.authmgr.oauth2.config;
 
-import java.util.Locale;
+import jakarta.annotation.Nullable;
+import java.util.List;
+import java.util.Optional;
 
-public enum PkceTransformation {
-  S256("S256"),
-  PLAIN("plain"),
-  ;
+public class ConfigUtils {
 
-  private final String canonicalName;
-
-  PkceTransformation(String canonicalName) {
-    this.canonicalName = canonicalName;
+  public static Optional<String> scopesAsString(List<String> scopes) {
+    return scopes.stream().reduce((a, b) -> a + " " + b);
   }
 
-  public String getCanonicalName() {
-    return canonicalName;
-  }
-
-  public static PkceTransformation fromConfigName(String name) {
-    try {
-      return valueOf(name.toUpperCase(Locale.ROOT));
-    } catch (IllegalArgumentException ignore) {
-      throw new IllegalArgumentException("Unknown OAuth2 dialect: " + name);
-    }
+  public static List<String> scopesAsList(@Nullable String scopes) {
+    return scopes == null || scopes.isBlank() ? List.of() : List.of(scopes.trim().split(" +"));
   }
 }

@@ -16,7 +16,8 @@
 package com.dremio.iceberg.authmgr.oauth2.flow;
 
 import com.dremio.iceberg.authmgr.oauth2.agent.OAuth2AgentSpec;
-import com.dremio.iceberg.authmgr.oauth2.config.ImpersonationConfig;
+import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthenticator;
+import com.dremio.iceberg.authmgr.oauth2.config.ConfigUtils;
 import com.dremio.iceberg.authmgr.oauth2.token.Tokens;
 import java.net.URI;
 import java.util.Map;
@@ -29,13 +30,16 @@ import org.apache.iceberg.rest.RESTClient;
  */
 class ImpersonatingTokenExchangeFlow extends TokenExchangeFlow {
 
-  private final ImpersonationConfig impersonationConfig;
+  private final OAuth2AgentSpec spec;
   private final EndpointResolver endpointResolver;
 
   ImpersonatingTokenExchangeFlow(
-      OAuth2AgentSpec spec, RESTClient restClient, EndpointResolver endpointResolver) {
-    super(spec, restClient, endpointResolver);
-    impersonationConfig = spec.getImpersonationConfig();
+      OAuth2AgentSpec spec,
+      RESTClient restClient,
+      EndpointResolver endpointResolver,
+      ClientAuthenticator clientAuthenticator) {
+    super(spec, restClient, endpointResolver, clientAuthenticator);
+    this.spec = spec;
     this.endpointResolver = endpointResolver;
   }
 
@@ -54,23 +58,16 @@ class ImpersonatingTokenExchangeFlow extends TokenExchangeFlow {
 
   @Override
   protected Map<String, String> getExtraRequestParameters() {
-    return impersonationConfig
+    return spec.getImpersonationConfig()
         .getExtraRequestParameters()
         .orElseGet(super::getExtraRequestParameters);
   }
 
   @Override
   protected Optional<String> getScopesAsString() {
-    return impersonationConfig
+    return spec.getImpersonationConfig()
         .getScopes()
-        .map(FlowUtils::scopesAsString)
+        .map(ConfigUtils::scopesAsString)
         .orElseGet(super::getScopesAsString);
-  }
-
-  @Override
-  protected ServiceAccount getServiceAccount() {
-    return impersonationConfig.getClientId().isPresent()
-        ? impersonationConfig
-        : super.getServiceAccount();
   }
 }

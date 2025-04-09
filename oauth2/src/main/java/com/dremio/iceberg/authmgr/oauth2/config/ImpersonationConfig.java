@@ -24,11 +24,10 @@ import static com.dremio.iceberg.authmgr.oauth2.OAuth2Properties.Impersonation.S
 import static com.dremio.iceberg.authmgr.oauth2.OAuth2Properties.Impersonation.TOKEN_ENDPOINT;
 
 import com.dremio.iceberg.authmgr.oauth2.OAuth2Properties;
+import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthentication;
 import com.dremio.iceberg.authmgr.oauth2.config.option.ConfigOption;
 import com.dremio.iceberg.authmgr.oauth2.config.option.ConfigOptions;
 import com.dremio.iceberg.authmgr.oauth2.config.validator.ConfigValidator;
-import com.dremio.iceberg.authmgr.oauth2.flow.FlowUtils;
-import com.dremio.iceberg.authmgr.oauth2.flow.ServiceAccount;
 import com.dremio.iceberg.authmgr.tools.immutables.AuthManagerImmutable;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import java.net.URI;
@@ -40,7 +39,7 @@ import org.immutables.value.Value;
 
 /** Configuration for OAuth2 impersonation. */
 @AuthManagerImmutable
-public interface ImpersonationConfig extends ServiceAccount {
+public interface ImpersonationConfig {
 
   ImpersonationConfig DEFAULT = builder().build();
 
@@ -55,23 +54,6 @@ public interface ImpersonationConfig extends ServiceAccount {
   default boolean isEnabled() {
     return false;
   }
-
-  /**
-   * An alternate client ID to use for impersonations only. If not provided, the global client ID
-   * will be used. If provided, and if the client is confidential, then its secret must be provided
-   * with {@link #getClientSecret()} – the global client secret will NOT be used.
-   *
-   * @see OAuth2Properties.Impersonation#CLIENT_ID
-   */
-  @Override
-  Optional<String> getClientId();
-
-  /**
-   * An alternate client secret supplier to use for impersonations only. If the alternate client
-   * obtained from {@link #getClientId()} is confidential, this attribute must be set.
-   */
-  @Override
-  Optional<Secret> getClientSecret();
 
   /**
    * The root URL of an alternate OpenID Connect identity issuer provider, which will be used for
@@ -99,6 +81,36 @@ public interface ImpersonationConfig extends ServiceAccount {
    * @see OAuth2Properties.Impersonation#TOKEN_ENDPOINT
    */
   Optional<URI> getTokenEndpoint();
+
+  /**
+   * An alternate client ID to use for impersonations only. If not provided, the global client ID
+   * will be used. If provided, and if the client is confidential, then its authentication method
+   * must be properly configured, and its secret, if any, must be provided with {@link
+   * #getClientSecret()} – the global client authentication method and secret will NOT be used.
+   *
+   * @see OAuth2Properties.Impersonation#CLIENT_ID
+   */
+  Optional<String> getClientId();
+
+  /**
+   * An alternate client authentication method for impersonations only. Defaults to {@link
+   * ClientAuthentication#CLIENT_SECRET_BASIC} if the client is private, or {@link
+   * ClientAuthentication#NONE} if the client is public.
+   *
+   * @see OAuth2Properties.Impersonation#CLIENT_AUTH
+   */
+  @Value.Default
+  default ClientAuthentication getClientAuthentication() {
+    return getClientSecret().isPresent()
+        ? ClientAuthentication.CLIENT_SECRET_BASIC
+        : ClientAuthentication.NONE;
+  }
+
+  /**
+   * An alternate client secret supplier to use for impersonations only. If the alternate client
+   * obtained from {@link #getClientId()} is confidential, this attribute must be set.
+   */
+  Optional<Secret> getClientSecret();
 
   /**
    * Custom OAuth2 scopes for impersonation only. Optional.
@@ -220,7 +232,7 @@ public interface ImpersonationConfig extends ServiceAccount {
     }
 
     private ConfigOption<List<String>> scopesOption() {
-      return ConfigOptions.of(SCOPE, this::scopes, FlowUtils::scopesAsList);
+      return ConfigOptions.of(SCOPE, this::scopes, ConfigUtils::scopesAsList);
     }
 
     private ConfigOption<Map<String, String>> extraRequestParametersOption() {

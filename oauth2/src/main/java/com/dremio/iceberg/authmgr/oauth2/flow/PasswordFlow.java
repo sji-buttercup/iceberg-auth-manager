@@ -16,6 +16,7 @@
 package com.dremio.iceberg.authmgr.oauth2.flow;
 
 import com.dremio.iceberg.authmgr.oauth2.agent.OAuth2AgentSpec;
+import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthenticator;
 import com.dremio.iceberg.authmgr.oauth2.config.ResourceOwnerConfig;
 import com.dremio.iceberg.authmgr.oauth2.config.Secret;
 import com.dremio.iceberg.authmgr.oauth2.rest.PasswordTokenRequest;
@@ -32,8 +33,12 @@ class PasswordFlow extends AbstractFlow {
 
   private final ResourceOwnerConfig resourceOwnerConfig;
 
-  PasswordFlow(OAuth2AgentSpec spec, RESTClient restClient, EndpointResolver endpointResolver) {
-    super(spec, restClient, endpointResolver);
+  PasswordFlow(
+      OAuth2AgentSpec spec,
+      RESTClient restClient,
+      EndpointResolver endpointResolver,
+      ClientAuthenticator clientAuthenticator) {
+    super(spec, restClient, endpointResolver, clientAuthenticator);
     resourceOwnerConfig = spec.getResourceOwnerConfig();
   }
 

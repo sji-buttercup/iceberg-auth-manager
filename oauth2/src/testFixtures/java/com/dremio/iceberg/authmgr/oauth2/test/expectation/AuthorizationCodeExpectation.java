@@ -23,6 +23,7 @@ import static com.dremio.iceberg.authmgr.oauth2.test.TestConstants.SCOPE2;
 import static com.dremio.iceberg.authmgr.oauth2.test.expectation.ErrorExpectation.AUTHORIZATION_SERVER_ERROR_RESPONSE;
 
 import com.dremio.iceberg.authmgr.oauth2.config.PkceTransformation;
+import com.dremio.iceberg.authmgr.oauth2.flow.FlowUtils;
 import com.dremio.iceberg.authmgr.oauth2.rest.ImmutableAuthorizationCodeTokenRequest;
 import com.dremio.iceberg.authmgr.oauth2.rest.PostFormRequest;
 import com.dremio.iceberg.authmgr.oauth2.uri.UriBuilder;
@@ -74,7 +75,8 @@ public abstract class AuthorizationCodeExpectation extends InitialTokenFetchExpe
       List<String> codeVerifier = params.get("code_verifier");
       if (codeVerifier == null
           || codeVerifier.isEmpty()
-          || !pkceCodeChallenge.equals(pkceTransformation.transform(codeVerifier.get(0)))) {
+          || !pkceCodeChallenge.equals(
+              FlowUtils.generateCodeChallenge(pkceTransformation, codeVerifier.get(0)))) {
         return AUTHORIZATION_SERVER_ERROR_RESPONSE;
       }
     }

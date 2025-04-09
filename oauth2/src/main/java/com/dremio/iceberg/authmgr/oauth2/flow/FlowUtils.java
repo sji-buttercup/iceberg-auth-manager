@@ -15,14 +15,12 @@
  */
 package com.dremio.iceberg.authmgr.oauth2.flow;
 
-import jakarta.annotation.Nullable;
+import com.dremio.iceberg.authmgr.oauth2.config.PkceTransformation;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
-import java.util.List;
-import java.util.Optional;
 import java.util.Random;
 
 public final class FlowUtils {
@@ -33,14 +31,6 @@ public final class FlowUtils {
   private static final Random RANDOM = new SecureRandom();
 
   private FlowUtils() {}
-
-  public static Optional<String> scopesAsString(List<String> scopes) {
-    return scopes.stream().reduce((a, b) -> a + " " + b);
-  }
-
-  public static List<String> scopesAsList(@Nullable String scopes) {
-    return scopes == null || scopes.isBlank() ? List.of() : List.of(scopes.trim().split(" +"));
-  }
 
   public static String randomAlphaNumString(int length) {
     return RANDOM
@@ -64,22 +54,30 @@ public final class FlowUtils {
   }
 
   /**
-   * Generates a code challenge for PKCE, using the S256 method.
+   * Generates a code challenge for PKCE.
    *
    * <p>See <a href="https://datatracker.ietf.org/doc/html/rfc7636#section-4.2">RFC 7636 Section
    * 4.2</a>
    */
-  public static String generateS256CodeChallenge(String codeVerifier) {
-    byte[] bytes = codeVerifier.getBytes(StandardCharsets.US_ASCII);
-    MessageDigest messageDigest;
-    try {
-      messageDigest = MessageDigest.getInstance("SHA-256");
-    } catch (NoSuchAlgorithmException e) {
-      throw new RuntimeException(e);
+  public static String generateCodeChallenge(
+      PkceTransformation transformation, String codeVerifier) {
+    switch (transformation) {
+      case S256:
+        byte[] bytes = codeVerifier.getBytes(StandardCharsets.US_ASCII);
+        MessageDigest messageDigest;
+        try {
+          messageDigest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+          throw new RuntimeException(e);
+        }
+        messageDigest.update(bytes, 0, bytes.length);
+        byte[] digest = messageDigest.digest();
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
+      case PLAIN:
+        return codeVerifier;
+      default:
+        throw new IllegalArgumentException("Unsupported PKCE transformation: " + transformation);
     }
-    messageDigest.update(bytes, 0, bytes.length);
-    byte[] digest = messageDigest.digest();
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
   }
 
   public static String getContextPath(String agentName) {

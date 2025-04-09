@@ -21,13 +21,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.dremio.iceberg.authmgr.oauth2.test.ImmutableTestEnvironment.Builder;
-import com.dremio.iceberg.authmgr.oauth2.test.KeycloakExtension;
 import com.dremio.iceberg.authmgr.oauth2.test.TestConstants;
+import com.dremio.iceberg.authmgr.oauth2.test.container.KeycloakContainerExtension;
 import com.dremio.iceberg.authmgr.oauth2.token.AccessToken;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-@ExtendWith(KeycloakExtension.class)
+@ExtendWith(KeycloakContainerExtension.class)
 public class OAuth2AgentKeycloakLongIT extends OAuth2AgentLongITBase {
 
   @Test

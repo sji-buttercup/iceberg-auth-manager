@@ -15,6 +15,7 @@
  */
 package com.dremio.iceberg.authmgr.oauth2;
 
+import com.dremio.iceberg.authmgr.oauth2.config.Dialect;
 import com.dremio.iceberg.authmgr.oauth2.grant.GrantCommonNames;
 
 /** Configuration constants for OAuth2. */
@@ -88,6 +89,26 @@ public final class OAuth2Properties {
      * {@linkplain #DIALECT Iceberg OAuth2 dialect}.
      */
     public static final String CLIENT_ID = PREFIX + "client-id";
+
+    /**
+     * The OAuth2 client authentication method to use. Valid values are:
+     *
+     * <ul>
+     *   <li>{@code none}: the client does not authenticate itself at the token endpoint, because it
+     *       is a public client with no client secret or other authentication mechanism.
+     *   <li>{@code client_secret_basic}: client secret is sent in the HTTP Basic Authorization
+     *       header.
+     *   <li>{@code client_secret_post}: client secret is sent in the request body as a form
+     *       parameter.
+     * </ul>
+     *
+     * The default is {@code client_secret_basic} if the client is private, or {@code none} if the
+     * client is public.
+     *
+     * <p>This property is ignored when dialect is {@link Dialect#ICEBERG_REST} or when a
+     * {@linkplain #TOKEN token} is provided.
+     */
+    public static final String CLIENT_AUTH = PREFIX + "client-auth";
 
     /**
      * Client secret to use when authenticating against the OAuth2 server. Required if the client is
@@ -439,6 +460,23 @@ public final class OAuth2Properties {
      * provided as well with {@value #CLIENT_SECRET} – the global client secret will NOT be used.
      */
     public static final String CLIENT_ID = Impersonation.PREFIX + "client-id";
+
+    /**
+     * For impersonation only. An alternate client authentication method to use. Valid values are:
+     *
+     * <ul>
+     *   <li>{@code none}: the client does not authenticate itself at the token endpoint, because it
+     *       is a public client with no client secret or other authentication mechanism.
+     *   <li>{@code client_secret_basic}: client secret is sent in the HTTP Basic Authorization
+     *       header.
+     *   <li>{@code client_secret_post}: client secret is sent in the request body as a form
+     *       parameter.
+     * </ul>
+     *
+     * The default is {@code client_secret_basic} if the client is private, or {@code none} if the
+     * client is public.
+     */
+    public static final String CLIENT_AUTH = PREFIX + "client-auth";
 
     /**
      * For impersonation only. The client secret to use, if {@value #CLIENT_ID} is defined and the

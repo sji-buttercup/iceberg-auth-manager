@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.dremio.iceberg.authmgr.oauth2.test;
+package com.dremio.iceberg.authmgr.oauth2.test.container;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
+import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthentication;
+import com.dremio.iceberg.authmgr.oauth2.test.TestConstants;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import jakarta.ws.rs.core.Response;
@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.assertj.core.api.Assertions;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.representations.idm.ClientRepresentation;
@@ -62,7 +63,12 @@ public class KeycloakContainer implements AutoCloseable {
             .withFeaturesEnabled("preview", "token-exchange")
             .withLogConsumer(new Slf4jLogConsumer(LOGGER))
             .withEnv(
-                "KC_LOG_LEVEL", getRootLoggerLevel() + ",org.keycloak:" + getKeycloakLoggerLevel());
+                "KC_LOG_LEVEL", getRootLoggerLevel() + ",org.keycloak:" + getKeycloakLoggerLevel())
+            // Useful when debugging Keycloak REST endpoints:
+            .withExposedPorts(8080, 9000, 5005)
+            .withEnv(
+                "JAVA_TOOL_OPTIONS",
+                "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005");
     keycloak.start();
     rootUrl = URI.create(keycloak.getAuthServerUrl());
     issuerUrl = rootUrl.resolve(CONTEXT_PATH);
@@ -74,8 +80,12 @@ public class KeycloakContainer implements AutoCloseable {
       updateMasterRealm(master);
       createScope(master);
       createUser(master);
-      createClient(master, TestConstants.CLIENT_ID1, true);
-      createClient(master, TestConstants.CLIENT_ID2, false);
+      createClient(
+          master,
+          TestConstants.CLIENT_ID1,
+          TestConstants.CLIENT_SECRET1,
+          ClientAuthentication.CLIENT_SECRET_BASIC);
+      createClient(master, TestConstants.CLIENT_ID2, null, ClientAuthentication.NONE);
     }
   }
 
@@ -136,16 +146,21 @@ public class KeycloakContainer implements AutoCloseable {
             "display.on.consent.screen",
             "true"));
     try (Response response = master.clientScopes().create(scope)) {
-      assertThat(response.getStatus()).isEqualTo(201);
+      Assertions.assertThat(response.getStatus()).isEqualTo(201);
     }
   }
 
-  protected void createClient(RealmResource master, String clientId, boolean confidential) {
+  protected void createClient(
+      RealmResource master,
+      String clientId,
+      String clientSecret,
+      ClientAuthentication authenticationMethod) {
     ClientRepresentation client = new ClientRepresentation();
     client.setId(UUID.randomUUID().toString());
     client.setClientId(clientId);
-    client.setPublicClient(!confidential);
-    client.setServiceAccountsEnabled(confidential); // required for client credentials grant
+    client.setPublicClient(authenticationMethod == ClientAuthentication.NONE);
+    client.setServiceAccountsEnabled(
+        authenticationMethod != ClientAuthentication.NONE); // required for client credentials grant
     client.setDirectAccessGrantsEnabled(true); // required for password grant
     client.setStandardFlowEnabled(true); // required for authorization code grant
     client.setRedirectUris(ImmutableList.of("http://localhost:*"));
@@ -157,15 +172,15 @@ public class KeycloakContainer implements AutoCloseable {
             "false",
             "oauth2.device.authorization.grant.enabled",
             "true"));
-    if (confidential) {
-      client.setSecret("s3cr3t");
+    if (authenticationMethod != ClientAuthentication.NONE) {
+      client.setSecret(clientSecret);
       ResourceServerRepresentation settings = new ResourceServerRepresentation();
       settings.setPolicyEnforcementMode(PolicyEnforcementMode.DISABLED);
       client.setAuthorizationSettings(settings);
     }
     client.setOptionalClientScopes(List.of(TestConstants.SCOPE1));
     try (Response response = master.clients().create(client)) {
-      assertThat(response.getStatus()).isEqualTo(201);
+      Assertions.assertThat(response.getStatus()).isEqualTo(201);
     }
   }
 
@@ -185,7 +200,7 @@ public class KeycloakContainer implements AutoCloseable {
     user.setEmailVerified(true);
     user.setRequiredActions(Collections.emptyList());
     try (Response response = master.users().create(user)) {
-      assertThat(response.getStatus()).isEqualTo(201);
+      Assertions.assertThat(response.getStatus()).isEqualTo(201);
     }
   }
 

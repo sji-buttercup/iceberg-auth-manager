@@ -13,30 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.dremio.iceberg.authmgr.oauth2.config;
+package com.dremio.iceberg.authmgr.oauth2.auth;
 
-import java.util.Locale;
+/** Interface for OAuth2-compliant client authenticators; they all require a client ID. */
+public interface StandardClientAuthenticator extends ClientAuthenticator {
 
-public enum PkceTransformation {
-  S256("S256"),
-  PLAIN("plain"),
-  ;
-
-  private final String canonicalName;
-
-  PkceTransformation(String canonicalName) {
-    this.canonicalName = canonicalName;
-  }
-
-  public String getCanonicalName() {
-    return canonicalName;
-  }
-
-  public static PkceTransformation fromConfigName(String name) {
-    try {
-      return valueOf(name.toUpperCase(Locale.ROOT));
-    } catch (IllegalArgumentException ignore) {
-      throw new IllegalArgumentException("Unknown OAuth2 dialect: " + name);
-    }
-  }
+  String getClientId();
 }

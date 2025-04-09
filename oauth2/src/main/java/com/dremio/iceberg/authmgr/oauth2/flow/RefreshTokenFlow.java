@@ -16,6 +16,7 @@
 package com.dremio.iceberg.authmgr.oauth2.flow;
 
 import com.dremio.iceberg.authmgr.oauth2.agent.OAuth2AgentSpec;
+import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthenticator;
 import com.dremio.iceberg.authmgr.oauth2.rest.RefreshTokenRequest;
 import com.dremio.iceberg.authmgr.oauth2.token.Tokens;
 import jakarta.annotation.Nullable;
@@ -28,8 +29,12 @@ import org.apache.iceberg.rest.RESTClient;
  */
 class RefreshTokenFlow extends AbstractFlow {
 
-  RefreshTokenFlow(OAuth2AgentSpec spec, RESTClient restClient, EndpointResolver endpointResolver) {
-    super(spec, restClient, endpointResolver);
+  RefreshTokenFlow(
+      OAuth2AgentSpec spec,
+      RESTClient restClient,
+      EndpointResolver endpointResolver,
+      ClientAuthenticator clientAuthenticator) {
+    super(spec, restClient, endpointResolver, clientAuthenticator);
   }
 
   @Override

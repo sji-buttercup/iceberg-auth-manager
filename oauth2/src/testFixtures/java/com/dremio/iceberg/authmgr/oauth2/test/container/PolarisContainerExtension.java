@@ -13,17 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.dremio.iceberg.authmgr.oauth2.test;
+package com.dremio.iceberg.authmgr.oauth2.test.container;
 
 import com.dremio.iceberg.authmgr.oauth2.config.Dialect;
 import com.dremio.iceberg.authmgr.oauth2.test.ImmutableTestEnvironment.Builder;
+import com.dremio.iceberg.authmgr.oauth2.test.TestEnvironment;
+import com.dremio.iceberg.authmgr.oauth2.test.TestEnvironmentExtension;
 import java.time.Clock;
 import java.util.List;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 
-public class PolarisExtension extends TestEnvironmentExtension
+public class PolarisContainerExtension extends TestEnvironmentExtension
     implements BeforeAllCallback, AfterAllCallback {
 
   @Override

@@ -30,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import static org.assertj.core.api.AssertionsForClassTypes.catchThrowable;
 
 import com.dremio.iceberg.authmgr.oauth2.OAuth2Properties.Basic;
+import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthentication;
 import com.dremio.iceberg.authmgr.oauth2.config.validator.ConfigValidator;
 import com.dremio.iceberg.authmgr.oauth2.grant.GrantType;
 import com.dremio.iceberg.authmgr.oauth2.test.TestConstants;
@@ -98,6 +99,13 @@ class BasicConfigTest {
                 .clientSecret("s3cr3t")
                 .tokenEndpoint(URI.create("https://example.com/token")),
             singletonList("client ID must not be empty (rest.auth.oauth2.client-id)")),
+        Arguments.of(
+            BasicConfig.builder()
+                .clientId("client1")
+                .clientAuthentication(ClientAuthentication.CLIENT_SECRET_BASIC)
+                .tokenEndpoint(URI.create("https://example.com/token")),
+            singletonList(
+                "client secret must not be empty when client authentication is 'client_secret_basic' (rest.auth.oauth2.client-auth / rest.auth.oauth2.client-secret)")),
         Arguments.of(
             BasicConfig.builder()
                 .clientId("client1")
@@ -326,6 +334,8 @@ class BasicConfigTest {
             Map.of(
                 Basic.TOKEN,
                 "",
+                Basic.CLIENT_AUTH,
+                "none",
                 Basic.CLIENT_SECRET,
                 "",
                 Basic.ISSUER_URL,

@@ -16,12 +16,9 @@
 package com.dremio.iceberg.authmgr.oauth2.flow;
 
 import com.dremio.iceberg.authmgr.oauth2.agent.OAuth2AgentSpec;
-import com.dremio.iceberg.authmgr.oauth2.rest.PostFormRequest;
+import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthenticator;
 import com.dremio.iceberg.authmgr.oauth2.token.Tokens;
 import com.dremio.iceberg.authmgr.oauth2.token.TypedToken;
-import jakarta.annotation.Nullable;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
 import org.apache.iceberg.rest.RESTClient;
 
@@ -32,8 +29,11 @@ import org.apache.iceberg.rest.RESTClient;
 class IcebergRefreshTokenFlow extends TokenExchangeFlow {
 
   IcebergRefreshTokenFlow(
-      OAuth2AgentSpec spec, RESTClient restClient, EndpointResolver endpointResolver) {
-    super(spec, restClient, endpointResolver);
+      OAuth2AgentSpec spec,
+      RESTClient restClient,
+      EndpointResolver endpointResolver,
+      ClientAuthenticator clientAuthenticator) {
+    super(spec, restClient, endpointResolver, clientAuthenticator);
   }
 
   @Override
@@ -43,23 +43,5 @@ class IcebergRefreshTokenFlow extends TokenExchangeFlow {
         currentTokens.getAccessToken(), "currentTokens.getAccessToken() is null");
     TypedToken subjectToken = TypedToken.of(currentTokens.getAccessToken());
     return fetchNewTokens(currentTokens, subjectToken, null);
-  }
-
-  @Override
-  protected Map<String, String> getHeaders(@Nullable Tokens currentTokens) {
-    Map<String, String> headers = new HashMap<>();
-    headers.put("Content-Type", PostFormRequest.CONTENT_TYPE);
-    // With Iceberg dialect servers must understand a token exchange request with either
-    // a Bearer or a Basic auth header. We use Basic if available, otherwise Bearer,
-    // because the latter is non-standard.
-    String header =
-        getServiceAccount()
-            .asBasicAuthHeader()
-            .orElseGet(
-                () ->
-                    "Bearer "
-                        + Objects.requireNonNull(currentTokens).getAccessToken().getPayload());
-    headers.put("Authorization", header);
-    return headers;
   }
 }

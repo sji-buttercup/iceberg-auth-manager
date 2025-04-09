@@ -23,9 +23,13 @@ import static com.dremio.iceberg.authmgr.oauth2.test.TestConstants.CLIENT_SECRET
 import static com.dremio.iceberg.authmgr.oauth2.test.TestConstants.REFRESH_TOKEN_EXPIRATION_TIME;
 import static com.dremio.iceberg.authmgr.oauth2.test.TokenAssertions.assertTokens;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.InstanceOfAssertFactories.type;
 
+import com.dremio.iceberg.authmgr.oauth2.auth.ClientSecretAuthenticator;
+import com.dremio.iceberg.authmgr.oauth2.auth.PublicClientAuthenticator;
 import com.dremio.iceberg.authmgr.oauth2.config.BasicConfig;
 import com.dremio.iceberg.authmgr.oauth2.config.ImpersonationConfig;
+import com.dremio.iceberg.authmgr.oauth2.config.Secret;
 import com.dremio.iceberg.authmgr.oauth2.grant.GrantType;
 import com.dremio.iceberg.authmgr.oauth2.test.TestEnvironment;
 import com.dremio.iceberg.authmgr.oauth2.token.AccessToken;
@@ -234,7 +238,7 @@ class ImpersonatingTokenExchangeFlowTest {
   }
 
   @Test
-  void getServiceAccount() {
+  void getClientAuthenticator() {
     // should use client credentials from impersonation config
     try (TestEnvironment env =
             TestEnvironment.builder()
@@ -252,10 +256,12 @@ class ImpersonatingTokenExchangeFlowTest {
                 .build();
         ImpersonatingTokenExchangeFlow flow =
             (ImpersonatingTokenExchangeFlow) env.newImpersonationFlow()) {
-      assertThat(flow.getServiceAccount().getClientId()).contains(CLIENT_ID2);
-      assertThat(flow.getServiceAccount().getClientSecret())
-          .isPresent()
-          .hasValueSatisfying(secret -> assertThat(secret.getSecret()).isEqualTo(CLIENT_SECRET2));
+      assertThat(flow)
+          .extracting("clientAuthenticator")
+          .asInstanceOf(type(ClientSecretAuthenticator.class))
+          .extracting(
+              ClientSecretAuthenticator::getClientId, ClientSecretAuthenticator::getClientSecret)
+          .containsExactly(CLIENT_ID2, Secret.of(CLIENT_SECRET2));
     }
     // should use client credentials from impersonation config
     try (TestEnvironment env =
@@ -270,8 +276,11 @@ class ImpersonatingTokenExchangeFlowTest {
                 .build();
         ImpersonatingTokenExchangeFlow flow =
             (ImpersonatingTokenExchangeFlow) env.newImpersonationFlow()) {
-      assertThat(flow.getServiceAccount().getClientId()).contains(CLIENT_ID2);
-      assertThat(flow.getServiceAccount().getClientSecret()).isNotPresent();
+      assertThat(flow)
+          .extracting("clientAuthenticator")
+          .asInstanceOf(type(PublicClientAuthenticator.class))
+          .extracting(PublicClientAuthenticator::getClientId)
+          .isEqualTo(CLIENT_ID2);
     }
     // should use client credentials from basic config
     try (TestEnvironment env =
@@ -285,10 +294,12 @@ class ImpersonatingTokenExchangeFlowTest {
                 .build();
         ImpersonatingTokenExchangeFlow flow =
             (ImpersonatingTokenExchangeFlow) env.newImpersonationFlow()) {
-      assertThat(flow.getServiceAccount().getClientId()).contains(CLIENT_ID1);
-      assertThat(flow.getServiceAccount().getClientSecret())
-          .isPresent()
-          .hasValueSatisfying(secret -> assertThat(secret.getSecret()).isEqualTo(CLIENT_SECRET1));
+      assertThat(flow)
+          .extracting("clientAuthenticator")
+          .asInstanceOf(type(ClientSecretAuthenticator.class))
+          .extracting(
+              ClientSecretAuthenticator::getClientId, ClientSecretAuthenticator::getClientSecret)
+          .containsExactly(CLIENT_ID1, Secret.of(CLIENT_SECRET1));
     }
   }
 }

@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.dremio.iceberg.authmgr.oauth2.test;
+package com.dremio.iceberg.authmgr.oauth2.test.container;
 
+import com.dremio.iceberg.authmgr.oauth2.test.TestConstants;
 import java.net.URI;
 import java.time.Duration;
 import org.slf4j.Logger;

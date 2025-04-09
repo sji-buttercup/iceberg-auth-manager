@@ -15,6 +15,7 @@
  */
 package com.dremio.iceberg.authmgr.oauth2.config;
 
+import static com.dremio.iceberg.authmgr.oauth2.OAuth2Properties.Basic.CLIENT_AUTH;
 import static com.dremio.iceberg.authmgr.oauth2.OAuth2Properties.Basic.CLIENT_ID;
 import static com.dremio.iceberg.authmgr.oauth2.OAuth2Properties.Basic.CLIENT_SECRET;
 import static com.dremio.iceberg.authmgr.oauth2.OAuth2Properties.Basic.DIALECT;
@@ -26,11 +27,10 @@ import static com.dremio.iceberg.authmgr.oauth2.OAuth2Properties.Basic.TOKEN;
 import static com.dremio.iceberg.authmgr.oauth2.OAuth2Properties.Basic.TOKEN_ENDPOINT;
 
 import com.dremio.iceberg.authmgr.oauth2.OAuth2Properties;
+import com.dremio.iceberg.authmgr.oauth2.auth.ClientAuthentication;
 import com.dremio.iceberg.authmgr.oauth2.config.option.ConfigOption;
 import com.dremio.iceberg.authmgr.oauth2.config.option.ConfigOptions;
 import com.dremio.iceberg.authmgr.oauth2.config.validator.ConfigValidator;
-import com.dremio.iceberg.authmgr.oauth2.flow.FlowUtils;
-import com.dremio.iceberg.authmgr.oauth2.flow.ServiceAccount;
 import com.dremio.iceberg.authmgr.oauth2.grant.GrantType;
 import com.dremio.iceberg.authmgr.oauth2.token.AccessToken;
 import com.dremio.iceberg.authmgr.tools.immutables.AuthManagerImmutable;
@@ -47,7 +47,7 @@ import org.immutables.value.Value;
 import org.slf4j.LoggerFactory;
 
 @AuthManagerImmutable
-public interface BasicConfig extends ServiceAccount {
+public interface BasicConfig {
 
   /**
    * The initial access token to use. Optional. If this is set, the agent will not attempt to fetch
@@ -110,15 +110,31 @@ public interface BasicConfig extends ServiceAccount {
    *
    * @see OAuth2Properties.Basic#CLIENT_ID
    */
-  @Override
   Optional<String> getClientId();
 
   /**
-   * The OAuth2 client secret supplier. Must be set if the client is private.
+   * The OAuth2 client authentication method. Defaults to {@link
+   * ClientAuthentication#CLIENT_SECRET_BASIC} if the client is private, or {@link
+   * ClientAuthentication#NONE} if the client is public.
+   *
+   * <p>Ignored when dialect is {@link Dialect#ICEBERG_REST} or when a {@linkplain #getToken()
+   * token} is provided.
+   *
+   * @see OAuth2Properties.Basic#CLIENT_AUTH
+   */
+  @Value.Default
+  default ClientAuthentication getClientAuthentication() {
+    return getClientSecret().isPresent()
+        ? ClientAuthentication.CLIENT_SECRET_BASIC
+        : ClientAuthentication.NONE;
+  }
+
+  /**
+   * The OAuth2 client secret. Must be set if the client is private (confidential) and client
+   * authentication is done using a client secret.
    *
    * @see OAuth2Properties.Basic#CLIENT_SECRET
    */
-  @Override
   Optional<Secret> getClientSecret();
 
   /**
@@ -234,11 +250,19 @@ public interface BasicConfig extends ServiceAccount {
             getClientId().isPresent() && !getClientId().get().isEmpty(),
             CLIENT_ID,
             "client ID must not be empty");
-        validator.check(
-            getClientSecret().isPresent() || getGrantType() != GrantType.CLIENT_CREDENTIALS,
-            List.of(GRANT_TYPE, CLIENT_SECRET),
-            "client secret must not be empty when grant type is '%s'",
-            GrantType.CLIENT_CREDENTIALS.getCommonName());
+        if (getClientAuthentication().isClientSecret()) {
+          validator.check(
+              getClientSecret().isPresent(),
+              List.of(CLIENT_AUTH, CLIENT_SECRET),
+              "client secret must not be empty when client authentication is '%s'",
+              ClientAuthentication.CLIENT_SECRET_BASIC.getCanonicalName());
+        } else {
+          validator.check(
+              getClientSecret().isPresent() || getGrantType() != GrantType.CLIENT_CREDENTIALS,
+              List.of(GRANT_TYPE, CLIENT_SECRET),
+              "client secret must not be empty when grant type is '%s'",
+              GrantType.CLIENT_CREDENTIALS.getCommonName());
+        }
       }
     }
     validator.validate();
@@ -251,6 +275,7 @@ public interface BasicConfig extends ServiceAccount {
     BasicConfig.Builder builder = builder();
     builder.tokenOption().merge(properties, getToken());
     builder.clientIdOption().merge(properties, getClientId());
+    builder.clientAuthenticationOption().merge(properties, getClientAuthentication());
     builder.clientSecretOption().merge(properties, getClientSecret());
     builder.issuerUrlOption().merge(properties, getIssuerUrl());
     builder.tokenEndpointOption().merge(properties, getTokenEndpoint());
@@ -275,6 +300,7 @@ public interface BasicConfig extends ServiceAccount {
       Objects.requireNonNull(properties, "properties must not be null");
       tokenOption().apply(properties);
       clientIdOption().apply(properties);
+      clientAuthenticationOption().apply(properties);
       clientSecretOption().apply(properties);
       issuerUrlOption().apply(properties);
       tokenEndpointOption().apply(properties);
@@ -306,6 +332,9 @@ public interface BasicConfig extends ServiceAccount {
     Builder clientId(String clientId);
 
     @CanIgnoreReturnValue
+    Builder clientAuthentication(ClientAuthentication clientAuthentication);
+
+    @CanIgnoreReturnValue
     default Builder clientSecret(String clientSecret) {
       return clientSecret(Secret.of(clientSecret));
     }
@@ -332,6 +361,11 @@ public interface BasicConfig extends ServiceAccount {
       return ConfigOptions.of(CLIENT_ID, this::clientId);
     }
 
+    private ConfigOption<ClientAuthentication> clientAuthenticationOption() {
+      return ConfigOptions.of(
+          CLIENT_AUTH, this::clientAuthentication, ClientAuthentication::fromConfigName);
+    }
+
     private ConfigOption<Secret> clientSecretOption() {
       return ConfigOptions.of(CLIENT_SECRET, this::clientSecret, Secret::of);
     }
@@ -349,7 +383,7 @@ public interface BasicConfig extends ServiceAccount {
     }
 
     private ConfigOption<List<String>> scopesOption() {
-      return ConfigOptions.of(SCOPE, this::scopes, FlowUtils::scopesAsList);
+      return ConfigOptions.of(SCOPE, this::scopes, ConfigUtils::scopesAsList);
     }
 
     private ConfigOption<Dialect> dialectOption() {
