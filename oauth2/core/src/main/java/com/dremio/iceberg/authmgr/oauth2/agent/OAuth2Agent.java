@@ -217,7 +217,13 @@ public final class OAuth2Agent implements Closeable {
       if (error instanceof CompletionException) {
         error = error.getCause();
       }
-      maybeWarn("Failed to fetch new tokens", error);
+      if (error instanceof RESTException) {
+        // Don't include the stack trace if the error is a RESTException,
+        // since it's not very useful and just clutters the logs.
+        maybeWarn("[{}] Failed to fetch new tokens: {}", name, error.toString());
+      } else {
+        maybeWarn("[{}] Failed to fetch new tokens", name, error);
+      }
     }
   }
 
@@ -277,7 +283,9 @@ public final class OAuth2Agent implements Closeable {
     if (expirationTime == null) {
       Duration defaultLifespan = spec.getTokenRefreshConfig().getAccessTokenLifespan();
       maybeWarn(
-          "Access token has no expiration time, assuming lifespan of " + defaultLifespan, null);
+          "[{}] Access token has no expiration time, assuming lifespan of {}",
+          name,
+          defaultLifespan);
       expirationTime = now.plus(defaultLifespan);
     }
     Duration delay =
@@ -314,7 +322,7 @@ public final class OAuth2Agent implements Closeable {
       return;
     }
     if (onFailedRenewalSchedule) {
-      maybeWarn("Failed to schedule next token renewal, forcibly sleeping", null);
+      maybeWarn("[{}] Failed to schedule next token renewal, forcibly sleeping", name);
     }
     sleeping.set(true);
     LOGGER.debug("[{}] Sleeping...", name);
@@ -361,24 +369,21 @@ public final class OAuth2Agent implements Closeable {
   }
 
   @SuppressWarnings("FutureReturnValueIgnored")
-  private void maybeWarn(String message, Throwable error) {
-    Instant now = clock.instant();
-    Instant last = lastWarn;
-    boolean shouldWarn =
-        last == null || Duration.between(last, now).compareTo(MIN_WARN_INTERVAL) > 0;
-    if (shouldWarn) {
-      // defer logging until the agent is used to avoid confusing log messages appearing
-      // before the agent is actually used
-      if (error instanceof RESTException) {
-        used.thenRun(() -> LOGGER.warn(message, name, error.toString()));
-      } else {
-        used.thenRun(() -> LOGGER.warn(message, name, error));
+  private void maybeWarn(String message, Object... args) {
+    if (LOGGER.isWarnEnabled()) {
+      Instant now = clock.instant();
+      Instant last = lastWarn;
+      boolean shouldWarn =
+          last == null || Duration.between(last, now).compareTo(MIN_WARN_INTERVAL) > 0;
+      if (shouldWarn) {
+        // defer logging until the agent is used to avoid confusing log messages appearing
+        // before the agent is actually used
+        used.thenRun(() -> LOGGER.warn(message, args));
+        lastWarn = now;
+        return;
       }
-      lastWarn = now;
-    } else if (LOGGER.isDebugEnabled()) {
-      String debugMsg = "[{}] " + message;
-      LOGGER.debug(debugMsg, name, error);
     }
+    LOGGER.debug(message, args);
   }
 
   static class MustFetchNewTokensException extends RuntimeException {
