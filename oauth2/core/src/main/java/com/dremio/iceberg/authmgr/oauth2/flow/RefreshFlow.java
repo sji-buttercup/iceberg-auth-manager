@@ -15,14 +15,20 @@
  */
 package com.dremio.iceberg.authmgr.oauth2.flow;
 
-/**
- * An interface representing an OAuth2 flow.
- *
- * <p>A flow is a short-lived component that represents a set of interactions (generally one, but
- * sometimes more) between the agent and the OAuth2 authorization server, in order to obtain access
- * tokens.
- *
- * @see InitialFlow
- * @see RefreshFlow
- */
-public interface Flow {}
+import com.dremio.iceberg.authmgr.oauth2.token.Tokens;
+import java.util.concurrent.CompletionStage;
+
+/** An interface representing an OAuth2 flow that can be used to refresh existing tokens. */
+public interface RefreshFlow extends Flow {
+
+  /**
+   * Refreshes the current tokens.
+   *
+   * <p>A flow may be stateful or stateless. Stateful flows should clean up internal resources when
+   * the returned {@link CompletionStage} completes.
+   *
+   * @param currentTokens The current tokens. Cannot be null.
+   * @return A future that completes when the tokens are refreshed.
+   */
+  CompletionStage<Tokens> refreshTokens(Tokens currentTokens);
+}
