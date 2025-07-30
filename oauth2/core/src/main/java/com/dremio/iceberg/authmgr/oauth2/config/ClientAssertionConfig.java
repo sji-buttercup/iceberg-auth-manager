@@ -130,13 +130,13 @@ public interface ClientAssertionConfig {
   default ClientAssertionConfig merge(Map<String, String> properties) {
     Objects.requireNonNull(properties, "properties must not be null");
     ClientAssertionConfig.Builder builder = builder();
-    builder.issuerOption().merge(properties, getIssuer());
-    builder.subjectOption().merge(properties, getSubject());
-    builder.audienceOption().merge(properties, getAudience());
-    builder.tokenLifespanOption().merge(properties, getTokenLifespan());
-    builder.extraClaimsOption().merge(properties, getExtraClaims());
-    builder.algorithmOption().merge(properties, getAlgorithm());
-    builder.privateKeyOption().merge(properties, getPrivateKey());
+    builder.issuerOption().set(properties, getIssuer());
+    builder.subjectOption().set(properties, getSubject());
+    builder.audienceOption().set(properties, getAudience());
+    builder.tokenLifespanOption().set(properties, getTokenLifespan());
+    builder.extraClaimsOption().set(properties, getExtraClaims());
+    builder.algorithmOption().set(properties, getAlgorithm());
+    builder.privateKeyOption().set(properties, getPrivateKey());
     return builder.build();
   }
 
@@ -152,13 +152,13 @@ public interface ClientAssertionConfig {
     @CanIgnoreReturnValue
     default Builder from(Map<String, String> properties) {
       Objects.requireNonNull(properties, "properties must not be null");
-      issuerOption().apply(properties);
-      subjectOption().apply(properties);
-      audienceOption().apply(properties);
-      tokenLifespanOption().apply(properties);
-      extraClaimsOption().apply(properties);
-      algorithmOption().apply(properties);
-      privateKeyOption().apply(properties);
+      issuerOption().set(properties);
+      subjectOption().set(properties);
+      audienceOption().set(properties);
+      tokenLifespanOption().set(properties);
+      extraClaimsOption().set(properties);
+      algorithmOption().set(properties);
+      privateKeyOption().set(properties);
       return this;
     }
 
@@ -186,32 +186,33 @@ public interface ClientAssertionConfig {
     ClientAssertionConfig build();
 
     default ConfigOption<String> issuerOption() {
-      return ConfigOptions.of(ClientAssertion.ISSUER, this::issuer);
+      return ConfigOptions.simple(ClientAssertion.ISSUER, this::issuer);
     }
 
     default ConfigOption<String> subjectOption() {
-      return ConfigOptions.of(ClientAssertion.SUBJECT, this::subject);
+      return ConfigOptions.simple(ClientAssertion.SUBJECT, this::subject);
     }
 
     default ConfigOption<String> audienceOption() {
-      return ConfigOptions.of(ClientAssertion.AUDIENCE, this::audience);
+      return ConfigOptions.simple(ClientAssertion.AUDIENCE, this::audience);
     }
 
     default ConfigOption<Duration> tokenLifespanOption() {
-      return ConfigOptions.of(ClientAssertion.TOKEN_LIFESPAN, this::tokenLifespan, Duration::parse);
+      return ConfigOptions.simple(
+          ClientAssertion.TOKEN_LIFESPAN, this::tokenLifespan, Duration::parse);
     }
 
     default ConfigOption<Map<String, String>> extraClaimsOption() {
-      return ConfigOptions.ofPrefix(ClientAssertion.EXTRA_CLAIMS_PREFIX, this::extraClaims);
+      return ConfigOptions.prefixMap(ClientAssertion.EXTRA_CLAIMS_PREFIX, this::extraClaims);
     }
 
     default ConfigOption<JwtSigningAlgorithm> algorithmOption() {
-      return ConfigOptions.of(
+      return ConfigOptions.simple(
           ClientAssertion.ALGORITHM, this::algorithm, JwtSigningAlgorithm::fromConfigName);
     }
 
     default ConfigOption<Path> privateKeyOption() {
-      return ConfigOptions.of(ClientAssertion.PRIVATE_KEY, this::privateKey, Paths::get);
+      return ConfigOptions.simple(ClientAssertion.PRIVATE_KEY, this::privateKey, Paths::get);
     }
   }
 }
