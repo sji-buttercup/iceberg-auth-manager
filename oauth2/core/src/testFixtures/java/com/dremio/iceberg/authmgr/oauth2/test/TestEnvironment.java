@@ -669,4 +669,22 @@ public abstract class TestEnvironment implements AutoCloseable {
   public void createErrorExpectations() {
     ImmutableErrorExpectation.of(this).create();
   }
+
+  // Prevent generation of equals(), hashCode() and toString() as this class is big
+  // and the generated methods are not useful.
+
+  @Override
+  public final int hashCode() {
+    return java.lang.System.identityHashCode(this);
+  }
+
+  @Override
+  public final boolean equals(Object obj) {
+    return this == obj;
+  }
+
+  @Override
+  public final String toString() {
+    return "TestEnvironment";
+  }
 }
