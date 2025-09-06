@@ -25,11 +25,13 @@ import com.dremio.iceberg.authmgr.oauth2.config.BasicConfig;
 import com.dremio.iceberg.authmgr.oauth2.config.ClientAssertionConfig;
 import com.dremio.iceberg.authmgr.oauth2.config.ConfigUtils;
 import com.dremio.iceberg.authmgr.oauth2.config.DeviceCodeConfig;
+import com.dremio.iceberg.authmgr.oauth2.config.HttpConfig;
 import com.dremio.iceberg.authmgr.oauth2.config.ResourceOwnerConfig;
 import com.dremio.iceberg.authmgr.oauth2.config.SystemConfig;
 import com.dremio.iceberg.authmgr.oauth2.config.TokenExchangeConfig;
 import com.dremio.iceberg.authmgr.oauth2.config.TokenRefreshConfig;
 import com.dremio.iceberg.authmgr.oauth2.flow.FlowFactory;
+import com.dremio.iceberg.authmgr.oauth2.http.HttpClientType;
 import com.dremio.iceberg.authmgr.oauth2.test.ImmutableTestEnvironment.Builder;
 import com.dremio.iceberg.authmgr.oauth2.test.expectation.ImmutableAuthorizationCodeExpectation;
 import com.dremio.iceberg.authmgr.oauth2.test.expectation.ImmutableClientCredentialsExpectation;
@@ -64,11 +66,13 @@ import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.net.URI;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.iceberg.CatalogProperties;
@@ -133,7 +137,12 @@ public abstract class TestEnvironment implements AutoCloseable {
 
   @Value.Lazy
   public HttpServer getServer() {
-    return isUnitTest() ? new UnitTestHttpServer() : new IntegrationTestHttpServer();
+    return isUnitTest() ? new UnitTestHttpServer(isSsl()) : new IntegrationTestHttpServer();
+  }
+
+  @Value.Default
+  public boolean isSsl() {
+    return false;
   }
 
   @Value.Default
@@ -245,6 +254,7 @@ public abstract class TestEnvironment implements AutoCloseable {
         .tokenExchangeConfig(getTokenExchangeConfig())
         .clientAssertionConfig(getClientAssertionConfig())
         .systemConfig(getSystemConfig())
+        .httpConfig(getHttpConfig())
         .build();
   }
 
@@ -537,6 +547,55 @@ public abstract class TestEnvironment implements AutoCloseable {
   public PrintStream getConsole() {
     return getUser().getConsole();
   }
+
+  @Value.Default
+  public HttpConfig getHttpConfig() {
+    HttpConfig.Builder builder =
+        HttpConfig.builder()
+            .clientType(getHttpClientType())
+            .sslProtocols(getSslProtocols())
+            .sslCipherSuites(getSslCipherSuites())
+            .sslTrustAll(isSslTrustAll())
+            .compressionEnabled(isCompressionEnabled());
+    getProxyHost().ifPresent(builder::proxyHost);
+    getProxyPort().ifPresent(builder::proxyPort);
+    getProxyUsername().ifPresent(builder::proxyUsername);
+    getProxyPassword().ifPresent(builder::proxyPassword);
+    getSslTrustStorePath().ifPresent(builder::sslTrustStorePath);
+    getSslTrustStorePassword().ifPresent(builder::sslTrustStorePassword);
+    return builder.build();
+  }
+
+  @Value.Default
+  public HttpClientType getHttpClientType() {
+    return HttpClientType.DEFAULT;
+  }
+
+  public abstract List<String> getSslProtocols();
+
+  public abstract List<String> getSslCipherSuites();
+
+  @Value.Default
+  public boolean isSslTrustAll() {
+    return false;
+  }
+
+  @Value.Default
+  public boolean isCompressionEnabled() {
+    return true;
+  }
+
+  public abstract Optional<String> getProxyHost();
+
+  public abstract OptionalInt getProxyPort();
+
+  public abstract Optional<String> getProxyUsername();
+
+  public abstract Optional<String> getProxyPassword();
+
+  public abstract Optional<Path> getSslTrustStorePath();
+
+  public abstract Optional<String> getSslTrustStorePassword();
 
   @Value.Default
   public boolean isForceInactiveUser() {
