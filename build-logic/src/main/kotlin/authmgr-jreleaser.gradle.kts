@@ -28,6 +28,9 @@ jreleaser {
   val excludedProjects =
     setOf("authmgr-oauth2-flink-tests", "authmgr-oauth2-spark-tests", "authmgr-oauth2-kafka-tests")
 
+  // Projects to include as release assets in the GitHub Release page
+  val assetsProjects = setOf("authmgr-oauth2-runtime", "authmgr-oauth2-standalone")
+
   project {
     name.set("Dremio Iceberg AuthManager")
     description.set("Dremio AuthManager for Apache Iceberg")
@@ -40,6 +43,23 @@ jreleaser {
     inceptionYear = "2025"
     vendor = "Dremio"
     copyright = "Copyright (c) ${LocalDate.now().year} Dremio"
+  }
+
+  // Required to upload release assets to the GitHub Release page
+  // see https://github.com/jreleaser/jreleaser/issues/1627
+  files {
+    subprojects
+      .filter { it.name in assetsProjects }
+      .forEach { project ->
+        artifact {
+          path.set(
+            project.layout.buildDirectory
+              .dir("libs")
+              .get()
+              .file("${project.name}-${rootProject.version}.jar")
+          )
+        }
+      }
   }
 
   signing {
