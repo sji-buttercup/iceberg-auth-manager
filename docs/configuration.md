@@ -413,6 +413,14 @@ The signing algorithm to use for the client assertion JWT. Optional. The default
 
 Algorithm names must match the "alg" Param Value as described in [RFC 7518 Section 3.1](https://datatracker.ietf.org/doc/html/rfc7518#section-3.1).
 
+### `rest.auth.oauth2.client-assertion.jwt.key-id`
+
+The key ID (kid) to include in the JWT header. Optional.
+
+If specified, this will be included in the "kid" header parameter of the JWT assertion. This is useful when the authorization server needs to identify which key to use for verification from a set of keys.
+
+This setting is only supported when using the `private_key_jwt` authentication method. It is ignored when using `client_secret_jwt`.
+
 ### `rest.auth.oauth2.client-assertion.jwt.private-key`
 
 The path on the local filesystem to the private key to use for signing the client assertion JWT. Required if the authentication method is `private_key_jwt`.
