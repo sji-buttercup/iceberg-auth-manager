@@ -93,6 +93,9 @@ public interface ClientAssertionConfig {
    * <p>If specified, this will be included in the "kid" header parameter of the JWT assertion. This
    * is useful when the authorization server needs to identify which key to use for verification
    * from a set of keys.
+   *
+   * <p>This setting is only supported when using the {@code private_key_jwt} authentication method.
+   * It is ignored when using {@code client_secret_jwt}.
    */
   @WithName(KEY_ID)
   Optional<String> getKeyId();
