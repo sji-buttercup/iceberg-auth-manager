@@ -119,8 +119,10 @@ class ClientAssertionConfigTest {
   void testKeyIdOptional() {
     Map<String, String> properties =
         Map.of(
-            PREFIX + '.' + ClientAssertionConfig.ALGORITHM, "RS256",
-            PREFIX + '.' + ClientAssertionConfig.PRIVATE_KEY, tempFile.toString());
+            PREFIX + '.' + ClientAssertionConfig.ALGORITHM,
+            "RS256",
+            PREFIX + '.' + ClientAssertionConfig.PRIVATE_KEY,
+            tempFile.toString());
     SmallRyeConfig smallRyeConfig =
         new SmallRyeConfigBuilder()
             .withMapping(ClientAssertionConfig.class, PREFIX)
