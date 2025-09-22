@@ -54,6 +54,7 @@ public interface ClientAssertionConfig {
   String ALGORITHM = "algorithm";
   String PRIVATE_KEY = "private-key";
   String EXTRA_CLAIMS = "extra-claims";
+  String KEY_ID = "key-id";
 
   String DEFAULT_TOKEN_LIFESPAN = "PT5M";
 
@@ -85,6 +86,16 @@ public interface ClientAssertionConfig {
    */
   @WithName(ALGORITHM)
   Optional<JWSAlgorithm> getAlgorithm();
+
+  /**
+   * The key ID (kid) to include in the JWT header. Optional.
+   *
+   * <p>If specified, this will be included in the "kid" header parameter of the JWT assertion. This
+   * is useful when the authorization server needs to identify which key to use for verification
+   * from a set of keys.
+   */
+  @WithName(KEY_ID)
+  Optional<String> getKeyId();
 
   /**
    * The path on the local filesystem to the private key to use for signing the client assertion
@@ -158,6 +169,7 @@ public interface ClientAssertionConfig {
     getAudience().ifPresent(a -> properties.put(PREFIX + '.' + AUDIENCE, a.getValue()));
     properties.put(PREFIX + '.' + TOKEN_LIFESPAN, getTokenLifespan().toString());
     getAlgorithm().ifPresent(a -> properties.put(PREFIX + '.' + ALGORITHM, a.getName()));
+    getKeyId().ifPresent(k -> properties.put(PREFIX + '.' + KEY_ID, k));
     getPrivateKey().ifPresent(p -> properties.put(PREFIX + '.' + PRIVATE_KEY, p.toString()));
     getExtraClaims().forEach((k, v) -> properties.put(PREFIX + '.' + EXTRA_CLAIMS + '.' + k, v));
     return Map.copyOf(properties);

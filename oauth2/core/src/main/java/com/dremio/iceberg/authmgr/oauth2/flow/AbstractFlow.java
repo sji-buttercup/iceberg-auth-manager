@@ -210,8 +210,9 @@ abstract class AbstractFlow implements Flow {
       Path privateKeyPath = getConfig().getClientAssertionConfig().getPrivateKey().orElseThrow();
       PrivateKey privateKey = PemReader.getInstance().readPrivateKey(privateKeyPath);
       try {
+        String kid = getConfig().getClientAssertionConfig().getKeyId().orElse(null);
         SignedJWT assertion =
-            JWTAssertionFactory.create(details, algorithm, privateKey, null, null, null, null);
+            JWTAssertionFactory.create(details, algorithm, privateKey, kid, null, null, null);
         return new PrivateKeyJWT(assertion);
       } catch (JOSEException e) {
         throw new RuntimeException(e);
