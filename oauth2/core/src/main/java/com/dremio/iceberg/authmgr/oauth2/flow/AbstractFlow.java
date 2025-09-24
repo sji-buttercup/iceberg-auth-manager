@@ -205,7 +205,6 @@ abstract class AbstractFlow implements Flow {
 
     } else if (method.equals(PRIVATE_KEY_JWT)) {
       JWTAssertionDetails details = createJwtAssertionDetails(tokenEndpoint);
-
       JWSAlgorithm algorithm =
           getConfig().getClientAssertionConfig().getAlgorithm().orElse(JWSAlgorithm.RS256);
       Path privateKeyPath = getConfig().getClientAssertionConfig().getPrivateKey().orElseThrow();
