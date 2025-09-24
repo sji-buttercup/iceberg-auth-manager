@@ -149,4 +149,38 @@ class ClientAssertionConfigTest {
         smallRyeConfig.getConfigMapping(ClientAssertionConfig.class, PREFIX);
     assertThat(config.getKeyId()).hasValue("my-key-123");
   }
+
+  @Test
+  void testAudienceListSingleValue() {
+    Map<String, String> properties =
+        Map.of(PREFIX + '.' + ClientAssertionConfig.AUDIENCE, "https://example.com");
+    SmallRyeConfig smallRyeConfig =
+        new SmallRyeConfigBuilder()
+            .withMapping(ClientAssertionConfig.class, PREFIX)
+            .withSources(new MapBackedConfigSource("catalog-properties", properties, 1000) {})
+            .build();
+    ClientAssertionConfig config =
+        smallRyeConfig.getConfigMapping(ClientAssertionConfig.class, PREFIX);
+    assertThat(config.getAudienceList()).hasSize(1);
+    assertThat(config.getAudienceList().get(0).getValue()).isEqualTo("https://example.com");
+  }
+
+  @Test
+  void testAudienceListMultipleValues() {
+    Map<String, String> properties =
+        Map.of(
+            PREFIX + '.' + ClientAssertionConfig.AUDIENCE,
+            "https://example.com,https://test.com,audience3");
+    SmallRyeConfig smallRyeConfig =
+        new SmallRyeConfigBuilder()
+            .withMapping(ClientAssertionConfig.class, PREFIX)
+            .withSources(new MapBackedConfigSource("catalog-properties", properties, 1000) {})
+            .build();
+    ClientAssertionConfig config =
+        smallRyeConfig.getConfigMapping(ClientAssertionConfig.class, PREFIX);
+    assertThat(config.getAudienceList()).hasSize(3);
+    assertThat(config.getAudienceList().get(0).getValue()).isEqualTo("https://example.com");
+    assertThat(config.getAudienceList().get(1).getValue()).isEqualTo("https://test.com");
+    assertThat(config.getAudienceList().get(2).getValue()).isEqualTo("audience3");
+  }
 }
