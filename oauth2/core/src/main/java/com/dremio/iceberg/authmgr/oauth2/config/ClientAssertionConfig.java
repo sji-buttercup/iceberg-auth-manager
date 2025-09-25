@@ -174,16 +174,10 @@ public interface ClientAssertionConfig {
     getSubject().ifPresent(s -> properties.put(PREFIX + '.' + SUBJECT, s.getValue()));
     getAudience()
         .ifPresent(
-            audiences -> {
-              StringBuilder audienceStr = new StringBuilder();
-              for (int i = 0; i < audiences.size(); i++) {
-                if (i > 0) {
-                  audienceStr.append(",");
-                }
-                audienceStr.append(audiences.get(i).getValue());
-              }
-              properties.put(PREFIX + '.' + AUDIENCE, audienceStr.toString());
-            });
+            a ->
+                properties.put(
+                    PREFIX + '.' + AUDIENCE,
+                    a.stream().map(Audience::getValue).collect(Collectors.joining(","))));
     properties.put(PREFIX + '.' + TOKEN_LIFESPAN, getTokenLifespan().toString());
     getAlgorithm().ifPresent(a -> properties.put(PREFIX + '.' + ALGORITHM, a.getName()));
     getKeyId().ifPresent(k -> properties.put(PREFIX + '.' + KEY_ID, k));
