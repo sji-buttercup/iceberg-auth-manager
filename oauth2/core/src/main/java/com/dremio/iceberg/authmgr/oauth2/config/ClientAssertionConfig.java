@@ -27,7 +27,6 @@ import io.smallrye.config.WithName;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,32 +71,7 @@ public interface ClientAssertionConfig {
    * single audience or a comma-separated list of audiences.
    */
   @WithName(AUDIENCE)
-  Optional<String> getAudience();
-
-  /**
-   * Parse the audience string into a list of Audience objects. If no audience is configured,
-   * returns an empty list.
-   */
-  default List<Audience> getAudienceList() {
-    if (!getAudience().isPresent()) {
-      return new ArrayList<>();
-    }
-
-    String audienceStr = getAudience().get().trim();
-    if (audienceStr.isEmpty()) {
-      return new ArrayList<>();
-    }
-
-    List<Audience> audiences = new ArrayList<>();
-    String[] parts = audienceStr.split(",");
-    for (String part : parts) {
-      String trimmed = part.trim();
-      if (!trimmed.isEmpty()) {
-        audiences.add(new Audience(trimmed));
-      }
-    }
-    return audiences;
-  }
+  Optional<List<Audience>> getAudience();
 
   /** The expiration time of the client assertion JWT. Optional. The default is 5 minutes. */
   @WithName(TOKEN_LIFESPAN)
@@ -198,7 +172,18 @@ public interface ClientAssertionConfig {
     Map<String, String> properties = new HashMap<String, String>();
     getIssuer().ifPresent(i -> properties.put(PREFIX + '.' + ISSUER, i.getValue()));
     getSubject().ifPresent(s -> properties.put(PREFIX + '.' + SUBJECT, s.getValue()));
-    getAudience().ifPresent(a -> properties.put(PREFIX + '.' + AUDIENCE, a));
+    getAudience()
+        .ifPresent(
+            audiences -> {
+              StringBuilder audienceStr = new StringBuilder();
+              for (int i = 0; i < audiences.size(); i++) {
+                if (i > 0) {
+                  audienceStr.append(",");
+                }
+                audienceStr.append(audiences.get(i).getValue());
+              }
+              properties.put(PREFIX + '.' + AUDIENCE, audienceStr.toString());
+            });
     properties.put(PREFIX + '.' + TOKEN_LIFESPAN, getTokenLifespan().toString());
     getAlgorithm().ifPresent(a -> properties.put(PREFIX + '.' + ALGORITHM, a.getName()));
     getKeyId().ifPresent(k -> properties.put(PREFIX + '.' + KEY_ID, k));

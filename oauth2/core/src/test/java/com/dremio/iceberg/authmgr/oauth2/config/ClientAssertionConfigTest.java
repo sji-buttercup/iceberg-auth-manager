@@ -151,7 +151,7 @@ class ClientAssertionConfigTest {
   }
 
   @Test
-  void testAudienceListSingleValue() {
+  void testAudienceSingleValue() {
     Map<String, String> properties =
         Map.of(PREFIX + '.' + ClientAssertionConfig.AUDIENCE, "https://example.com");
     SmallRyeConfig smallRyeConfig =
@@ -161,12 +161,13 @@ class ClientAssertionConfigTest {
             .build();
     ClientAssertionConfig config =
         smallRyeConfig.getConfigMapping(ClientAssertionConfig.class, PREFIX);
-    assertThat(config.getAudienceList()).hasSize(1);
-    assertThat(config.getAudienceList().get(0).getValue()).isEqualTo("https://example.com");
+    assertThat(config.getAudience()).isPresent();
+    assertThat(config.getAudience().get()).hasSize(1);
+    assertThat(config.getAudience().get().get(0).getValue()).isEqualTo("https://example.com");
   }
 
   @Test
-  void testAudienceListMultipleValues() {
+  void testAudienceMultipleValues() {
     Map<String, String> properties =
         Map.of(
             PREFIX + '.' + ClientAssertionConfig.AUDIENCE,
@@ -178,8 +179,9 @@ class ClientAssertionConfigTest {
             .build();
     ClientAssertionConfig config =
         smallRyeConfig.getConfigMapping(ClientAssertionConfig.class, PREFIX);
-    assertThat(config.getAudienceList()).hasSize(2);
-    assertThat(config.getAudienceList().get(0).getValue()).isEqualTo("https://auth1.example.com");
-    assertThat(config.getAudienceList().get(1).getValue()).isEqualTo("https://auth2.example.com");
+    assertThat(config.getAudience()).isPresent();
+    assertThat(config.getAudience().get()).hasSize(2);
+    assertThat(config.getAudience().get().get(0).getValue()).isEqualTo("https://auth1.example.com");
+    assertThat(config.getAudience().get().get(1).getValue()).isEqualTo("https://auth2.example.com");
   }
 }
