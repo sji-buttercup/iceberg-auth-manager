@@ -235,7 +235,7 @@ abstract class AbstractFlow implements Flow {
         getConfig()
             .getClientAssertionConfig()
             .getAudience()
-            .orElse(List.of(new Audience(tokenEndpoint)));
+            .orElseGet(() -> List.of(new Audience(tokenEndpoint)));
     Instant issuedAt = getRuntime().getClock().instant();
     Instant expiration = issuedAt.plus(getConfig().getClientAssertionConfig().getTokenLifespan());
     @SuppressWarnings({"rawtypes", "unchecked"})

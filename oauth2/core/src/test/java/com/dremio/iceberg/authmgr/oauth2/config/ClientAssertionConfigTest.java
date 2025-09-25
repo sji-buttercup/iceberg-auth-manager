@@ -161,9 +161,7 @@ class ClientAssertionConfigTest {
             .build();
     ClientAssertionConfig config =
         smallRyeConfig.getConfigMapping(ClientAssertionConfig.class, PREFIX);
-    assertThat(config.getAudience()).isPresent();
-    assertThat(config.getAudience().get()).hasSize(1);
-    assertThat(config.getAudience().get().get(0).getValue()).isEqualTo("https://example.com");
+    assertThat(config.getAudience()).contains(List.of(new Audience("https://example.com")));
   }
 
   @Test
@@ -179,9 +177,10 @@ class ClientAssertionConfigTest {
             .build();
     ClientAssertionConfig config =
         smallRyeConfig.getConfigMapping(ClientAssertionConfig.class, PREFIX);
-    assertThat(config.getAudience()).isPresent();
-    assertThat(config.getAudience().get()).hasSize(2);
-    assertThat(config.getAudience().get().get(0).getValue()).isEqualTo("https://auth1.example.com");
-    assertThat(config.getAudience().get().get(1).getValue()).isEqualTo("https://auth2.example.com");
+    assertThat(config.getAudience())
+        .contains(
+            List.of(
+                new Audience("https://auth1.example.com"),
+                new Audience("https://auth2.example.com")));
   }
 }
