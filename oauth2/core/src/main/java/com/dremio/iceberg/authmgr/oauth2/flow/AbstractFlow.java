@@ -205,17 +205,6 @@ abstract class AbstractFlow implements Flow {
 
     } else if (method.equals(PRIVATE_KEY_JWT)) {
       JWTAssertionDetails details = createJwtAssertionDetails(tokenEndpoint);
-      // Debug print JWT assertion details including headers and claims
-      LOGGER.debug("[{}] JWT Assertion Details:", getConfig().getSystemConfig().getAgentName());
-      LOGGER.debug("Issuer: {}", details.getIssuer());
-      LOGGER.debug("Subject: {}", details.getSubject());
-      LOGGER.debug("Audiences: {}", details.getAudience());
-      LOGGER.debug("Expiration: {}", details.getExpirationTime());
-      LOGGER.debug("Issued At: {}", details.getIssueTime());
-      LOGGER.debug("JWT ID: {}", details.getJWTID());
-
-      // Will print headers and claims after JWT is created
-
       JWSAlgorithm algorithm =
           getConfig().getClientAssertionConfig().getAlgorithm().orElse(JWSAlgorithm.RS256);
       Path privateKeyPath = getConfig().getClientAssertionConfig().getPrivateKey().orElseThrow();
@@ -224,12 +213,8 @@ abstract class AbstractFlow implements Flow {
         String kid = getConfig().getClientAssertionConfig().getKeyId().orElse(null);
         SignedJWT assertion =
             JWTAssertionFactory.create(details, algorithm, privateKey, kid, null, null, null);
-
-        // Print JWT headers and claims for debugging
-        LOGGER.debug("JWT Header: {}", assertion.getHeader().toJSONObject());
-        LOGGER.debug("JWT Claims: {}", assertion.getJWTClaimsSet().toJSONObject());
         return new PrivateKeyJWT(assertion);
-      } catch (Exception e) {
+      } catch (JOSEException e) {
         throw new RuntimeException(e);
       }
     }
